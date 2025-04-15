@@ -64,7 +64,7 @@ def cg(n ,A ,d ,Q ,D ,neig ,x ,epsx=1e-9 ,maxDx=1e18 ,epsg=1e-9 ,nMax=500 ,isSof
             return isDxSmall, isHhSmall, xnew, Ah, hAh
         
         xnew=x+tstar
-        print("xnew:",xnew)
+        #print("xnew:",xnew)
         return isDxSmall, isHhSmall, xnew, Ah, hAh
 
     while toStop == 0:
@@ -104,10 +104,10 @@ def cg(n ,A ,d ,Q ,D ,neig ,x ,epsx=1e-9 ,maxDx=1e18 ,epsg=1e-9 ,nMax=500 ,isSof
             h=-g + beta*h0
  
         # debug
-        print("iter:",niter)
-        print("x:",x)
-        print("g:",g)
-        print("h:",h)
+        #print("iter:",niter)
+        #print("x:",x)
+        #print("g:",g)
+        #print("h:",h)
         isDxSmall,isHhSmall,x,Ah0,h0Ah0=exactLineSearch(x,g,h)
         
         niter=niter+1
