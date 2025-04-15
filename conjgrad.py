@@ -42,7 +42,7 @@ def cg(n ,A ,d ,Q ,D ,neig ,x ,epsx=1e-9 ,maxDx=1e18 ,epsg=1e-9 ,nMax=500 ,isSof
         xnew, isDxSmall, isHhSmall, Ah, hAh = x, 0, 0, np.zeros((n,1)), 0
 
         hh=-(h.T @ g)
-        print(hh)
+        #print(hh)
         # if hh<0, x is already optimal along h
         if hh<=epsgg: # no update. When hh=0, h=0, so optimal and stop
             isHhSmall=1
