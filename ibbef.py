@@ -1,12 +1,12 @@
-def main(p,n,y,X,A,Q,D,b,c,k,x0,xrelax):
+def main(p,n,y,X,A,b,c,k,xrelax):
     """IBB+ with lb using recycled echelon form
 
-       x0: xRelaxedOpt
+       xrelax: xRelaxedOpt
     """
     import sys
     import numpy as np
     from scipy import linalg
-    from scipy import minimize
+    from scipy.optimize import minimize
     import heapq
 
     epsilon=sys.float_info.epsilon    
@@ -32,17 +32,17 @@ def main(p,n,y,X,A,Q,D,b,c,k,x0,xrelax):
        A=A[np.ix_(ipiv0,ipiv0)]
        b=b[ipiv0]
        X=X[:,ipiv0]
-       x0=x0[ipiv0]
+       xrelax=xrelax[ipiv0]
     else: 
        A=np.vstack( (  np.hstack((A[np.ix_(ipiv0,ipiv0)],A[np.ix_(ipiv0,ipiv1)])),np.hstack( (A[np.ix_(ipiv1,ipiv0)],A[np.ix_(ipiv1,ipiv1)]) )) )
        b=np.concatenate( (b[ipiv0],b[ipiv1]) )
        X=np.hstack( (X[:,ipiv0],X[:,ipiv1]) )
-       x0=np.concatenate( (x0[ipiv0],x0[ipiv1]) )
+       xrelax=np.concatenate( (xrelax[ipiv0],xrelax[ipiv1]) )
 
     print('A:',A)
     print('b:',b)
     #print('X:',X)
-    #print('x0:',x0)
+    #print('xrelax:',xrelax)
 
     # get custom col echelon form of X
     def colech():
@@ -88,10 +88,10 @@ def main(p,n,y,X,A,Q,D,b,c,k,x0,xrelax):
     #print('Ab:',Ab)
     niter=0
     num_box=1
-    xbest=np.zeros(p,1) # intialize xbest
+    xbest=np.zeros((p,1)) # intialize xbest
     supp0,xbest[supp0]=getklargest(absxrelax,k)
     fbest=fx(xbest[supp0],A[np.ix_(supp0,supp0)],b[supp0],c)
-    print('xbest,fbest:',xbest,fbest)
+    #print('xbest,fbest:',xbest,fbest)
     B0=np.ones(p,dtype=int) # initial box of integer ones
 
     def rowech():
@@ -136,94 +136,121 @@ def main(p,n,y,X,A,Q,D,b,c,k,x0,xrelax):
         # select a new box to process
         Y=heapq.heappop(L) # V[0]=fxlb, V[1]=box, V[2]=#0, V[3]=#1, V[4]=#2, V[5]=xlb
         num_box=num_box-1
-        branch()
 
-        def branch():
-            """ partition the current box and process the child boxes
+        par_dir=np.arange(Y[1].size)[Y[1]==1][::-1]  # indices of partition direction in decreasing order
+        stop_par=0  # to stop the partition loop
+        isDC2true=0     # flag to avoid checking DC2 for every flag 2 child box
+        uplimit=p-k-Y[2] 
+        num_child=min(uplimit,float('inf'))
 
-            """
-            par_dir=np.arange(Y[1].size)[Y[1]==1][::-1]  # indices of partition direction in decreasing order
-            stop_par=0  # to stop the partition loop
-            isDC2true=0     # flag to avoid checking DC2 for every flag 2 child box
-            uplimit=p-k-Y[2] 
-            num_child=min(uplimit,float('inf'))
+        for j in range(num_child):
 
-            for j in range(num_child):
+            jhat=par_dir[j]  # partition index
+            temp=Y[1]
+            temp[jhat]=0    # child box with 0 flag
+            V0=(temp , Y[2]+1, Y[3]-1, Y[4]) # initialization 
+            temp=Y[1]
+            temp[jhat]=2   # child box with 2 flag
+            V2=(temp , Y[2], Y[3]-1, Y[4]+1)
 
-                jhat=par_dir[j]  # partition index
-                temp=Y[1]
-                temp[jhat]=0    # child box with 0 flag
-                V0=(temp , Y[2]+1, Y[3]-1, Y[4]) # initialization 
-                temp=Y[1]
-                temp[jhat]=2   # child box with 2 flag
-                V2=(temp , Y[2], Y[3]-1, Y[4]+1)
+            for ichild in range(2):
 
-                for ichild in range(2):
-
-                    if ichild==0: # box with 0 flag
-                        if j==(uplimit-1): # reached leaf node with k flag 1 in it
-                            # find the feasible point
-
-                        # inclusion function call
-                        if V0[2]<npiv0: #  if #1 < npiv0
-                            if V0[3]==0: # no flag 0 in the box
+                if ichild==0: # box with 0 flag
+                    if j==(uplimit-1): # reached leaf node with k flag 1 in it
+                        # find the feasible point
+                        if V0[2]<npiv0: # if #flag 1 < rank X
+                            if V0[3]==0: # if there is no flag 2 in the box
                                 xhat=backsub(p, V0[2], E0, range(V0[2]))
-                            else:
-                                id=newpivcol(V0[2],V0[3],p,npiv0,n,V0[0],X,CE0)
-                                xhat=efupdate(V0[2],V0[3],p,npiv0,id,Ab,E0)
-                            
-                            fxhat=fx(xhat,A,b,c)
 
-                        else: # if #flag 1 >= rank X
+                            else:
+                                id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
+                                xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
+
+                            fxhat=fx(xhat, A, b, c)
+
+                        else:
+                            xhat=xhat0
+                            fxhat=fxhat0
+
+                        # update xbest ,fbest if possible
+                        if fxhat<fbest:
+                            xbest=xhat
+                            fbest=fxhat
+                            
+                        continue # with the next ichild iteration
+
+                    # sampling call
+                    xtilde,fxtilde=getfeasiblept(p,k,V0[0],A,b,c,xrelax,absxrelax)
+                    if fxtilde<fbest:
+                        xbest=xtilde
+                        fbest=fxtilde
+
+                    # inclusion function call
+                    if V0[2] < npiv0: #  if #1 < npiv0
+                        if V0[3]==0: # no flag 0 in the box
+                            xhat=backsub(p, V0[2], E0, range(V0[2]))
+                        else:
+                            id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
+                            xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
+                            
+                        fxhat=fx(xhat,A,b,c)
+
+                    else: # if #flag 1 >= rank X
                             xhat=xhat0
                             fxhat=fxhat0
                         
-                        xlb=xhat
-                        fxlb=fxhat0
+                    xlb=xhat
+                    fxlb=fxhat0
 
-                        # check DC1
-                        if fbest<=fxlb:
-                            stop_par=1 # stop the j loop
-                            continue # with the next ichild iteration
+                    # check DC1
+                    if fbest<=fxlb:
+                        stop_par=1 # stop the j loop
+                        continue # with the next ichild iteration
 
-                        Y=(fxlb) + V0 + (xlb)
+                    Y=(fxlb) + V0 + (xlb)
 
-                    else: # box with 2 flag
+                else: # box with 2 flag
 
-                        # check DC2
-                        if j==0:
-                            if Y[4]+1==k:
-                                isDC2true=1 # DC2 is satisfied for all the subsequent child boxes,check it only once
+                    # check DC2
+                    if j==0:
+                        if Y[4]+1==k:
+                            isDC2true=1 # DC2 is satisfied for all the subsequent child boxes,check it only once
 
-                        if isDC2true==1:
-                            # call lb QM
-                            xhat,fxhat=quad_min(p,V2[0],A,b,c,xrelax)
-                            # update xbest, fbest if possible
-                            if fxhat<fbest:
-                                xbest=xhat
-                                fbest=fxhat
-                                continue # with the next iter of j loop
+                    if isDC2true==1:
+                        # call lb QM
+                        xhat,fxhat=quad_min(p,V2[0],A,b,c,xrelax)
+                        # update xbest, fbest if possible
+                        if fxhat<fbest:
+                            xbest=xhat
+                            fbest=fxhat
+                        
+                        continue # with the next iter of j loop
 
-                            # call feasiblity sampling
-                            xtilde,fxtilde=getfeasiblept(p,k,V2[0],A,b,c,xrelax,absxrelax)
-                            if fxtilde<fbest:
-                                xbest=xtilde
-                                fbest=fxtilde
+                    # call feasiblity sampling
+                    xtilde,fxtilde=getfeasiblept(p,k,V2[0],A,b,c,xrelax,absxrelax)
+                    if fxtilde<fbest:
+                        xbest=xtilde
+                        fbest=fxtilde
                             
-                            xlb=Y[5]
-                            fxlb=Y[0]
+                    xlb=Y[5]
+                    fxlb=Y[0]
 
-                            # check DC1
-                            if fbest<=fxlb:
-                                continue # discard the box
+                    # check DC1
+                    if fbest<=fxlb:
+                        continue # discard the box
 
-                            heapq.heappush( L, (fxlb) + V2 + (xlb) )  # add the V2 box to the list
+                    heapq.heappush( L, (fxlb) + V2 + (xlb) )  # add the V2 box to the list
+            
 
+    
+    # final output
+    xout=np.zeros((p,1))
+    xout[ipiv0]=xbest[:npiv0]
+    xout[ipiv1]=xbest[npiv0:p]
+    fout=fbest
 
+    return xout, fout
                                 
-
-
-
 
 
 def newpivcol(n1,n2,p,r,n,Y,X,CE0):
@@ -340,12 +367,12 @@ def backsub(n,num_piv,E,idx_piv):
 
     x = np.zeros((n,1)) # initialize
     for i in range(num_piv-1,-1,-1):
-        print('i:',i)
+        #print('i:',i)
         sum=0
         for j in range(i+1,num_piv):
-            print('j:',j)
+            #print('j:',j)
             sum = sum + E[idx_piv[i],idx_piv[j]]*x[idx_piv[j]]
-            print('sum:',sum)
+            #print('sum:',sum)
         
         x[idx_piv[i]]=E[idx_piv[i],n] - sum
         #print('idx[i]:',idx_piv[i])
@@ -415,7 +442,14 @@ def getklargest(given_list,select_k):
     
         """
         import numpy as np
+        #print('given_list:',given_list)
+        #print('k:',select_k)
+        if np.shape(given_list)[0]!=1: # if is not a 1D array
+            given_list_1D=given_list.flatten()
 
-        indices_k_largest=np.argpartition(given_list,-select_k)[-select_k:]
+        else:
+            given_list_1D=given_list
+        
+        indices_k_largest=np.argpartition(given_list_1D,-select_k)[-select_k:]
         list_k_largest=given_list[indices_k_largest]
         return indices_k_largest,list_k_largest
