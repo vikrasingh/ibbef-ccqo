@@ -1,4 +1,4 @@
-def main(p,n,y,X,A,Q,D,b,c,k,x0):
+def main(p,n,y,X,A,Q,D,b,c,k,x0,xrelax):
     """IBB+ with lb using recycled echelon form
 
        x0: xRelaxedOpt
@@ -7,6 +7,14 @@ def main(p,n,y,X,A,Q,D,b,c,k,x0):
     import numpy as np
     from scipy import linalg
     import heapq
+
+    def getklargest(given_list,select_k):
+        """ Extract a sub array of size kx1 with k largest entries
+    
+        """
+        indices_k_largest=np.argpartition(given_list,-select_k)[-select_k:]
+        list_k_largest=given_list[indices_k_largest]
+        return indices_k_largest,list_k_largest
 
     epsilon=sys.float_info.epsilon    
     pivtol=max(p,n)*epsilon*np.linalg.norm( A, ord=np.inf)  #  tol to check non-zero pivot for echelon form
@@ -17,6 +25,7 @@ def main(p,n,y,X,A,Q,D,b,c,k,x0):
     ipiv0=ipiv0[0:npiv0]
     ipiv1=[i for i in range(p) if i not in ipiv0]
     
+    absxrelax=np.abs(xrelax) # absolute value of xrelax array
     print('A:',A)
     print('ipiv0:',ipiv0)
     print('ipiv1:',ipiv1)
@@ -86,6 +95,10 @@ def main(p,n,y,X,A,Q,D,b,c,k,x0):
     #print('Ab:',Ab)
     niter=0
     num_box=1
+    xbest=np.zeros(p,1) # intialize xbest
+    supp0,xbest[supp0]=getklargest(absxrelax,k)
+    fbest=fx(xbest[supp0],A[np.ix_(supp0,supp0)],b[supp0],c)
+    print('xbest,fbest:',xbest,fbest)
     B0=np.ones(p,dtype=int) # initial box of integer ones
 
     def rowech():
@@ -108,7 +121,9 @@ def main(p,n,y,X,A,Q,D,b,c,k,x0):
     print('E0:',E0)
     xlb=backsub(p,npiv0,E0,np.array(range(npiv0)))
     #xlb[ipiv0]=xlb
-    fxlb=fx(v,A,b,c)
+    fxlb=fx(xlb,A,b,c)
+    xhat0=xlb
+    fxhat0=fxlb
     #print('xlb :',xlb)
     #print('fxlb:',fxlb)
     #print('size fxlb:',np.size(fxlb))
@@ -161,19 +176,138 @@ def main(p,n,y,X,A,Q,D,b,c,k,x0):
                             if V0[3]==0: # no flag 0 in the box
                                 xhat=backsub(p, V0[2], E0, range(V0[2]))
                             else:
-                                id=newpivcol
+                                id=newpivcol(V0[2],V0[3],p,npiv0,n,V0[0],X,CE0)
+                                xhat=efupdate(V0[2],V0[3],p,npiv0,id,Ab,E0)
+                            
+                            fxhat=fx(xhat,A,b,c)
 
+                        else: # if #flag 1 >= rank X
+                            xhat=xhat0
+                            fxhat=fxhat0
+                        
+                        xlb=xhat
+                        fxlb=fxhat0
 
+                        # check DC1
+                        if fbest<=fxlb:
+                            stop_par=1 # stop the j loop
+                            continue # with the next ichild iteration
+
+                        Z1=fxlb + V0 + xlb
 
                     else: # box with 2 flag
 
 
 
 
+def newpivcol(n1,n2,p,r,n,Y,X,CE0):
+    """ Determine new pivot columns among the flag 2 columns
+
+        Assumption: n1< rank X    
+        Input:
+        n1 : # flag 1
+        n2 : # flag 2
+        X : design matrix of order nxp
+        r : rank of X
+        Y : flag array of the current box Y with first n1 entries as flag 1
+        CE0 : column echelon form of order nxr
+        Output:
+        id with pivot column indices, with some negative indices
+        id[i] < 0 means x[-id[i]] is a new basic variable i.e. x[-id[i]]=/0
+        id[i] > 0 means x[id[i]] is a non basic variable i.e. x[id[i]]=0
+    """
+    import numpy as np
+
+    d=min(n1+n2,r)
+    id=np.zeros(d) # initialization
+    id[:n1]=np.array(range(n1)) # the first n1 entries of Y are flag 1
+    iflag2=np.where(Y==2) # indices of flag 2 entries in Y
+    id[n1:d]=iflag2[:d-n1]
+
+    CE=np.hstack( ( CE0[:,:n1],X[:,id[n1:d]] ) ) # initialize CE as col echelon form of X
+    T=CE.T   # use EROs on the transpose, T=[U, *; V, W]
+    # reduce the lower left block of T corresponding to the first n1 cols
+    # to zero to get ET=[U, *; 0, Z] after EROs
+    ET=T # initialization
+    for j in range(n1):
+        ETi=-ET[j,j:n]
+        for i in range(n1,d):
+            ET[i,j:n]=ETi*ET[i,j] + ET[i,j:n]
+        
+    # now, ET=[U, *; 0, Z]
+
+    num_npr=0  # no. of new pivot cols
+    for i in range(n1,n1+n2): # first n1 rows of T are not changed
+        if np.abs(ET[i,n1:d]).sum() > 1e-10: # if the row is not a zero row
+            num_npr=num_npr+1
+            jz=np.abs(ET[i,n1:d]).argmax()  # find the entry with largest magnitude to used as pivot entry
+            jz=jz+1
+            ET[i,n1:d]=ET[i,n1:d]/ET[i,jz] # make the pivot entry 1
+            ETi=-ET[i,n1:d]
+            for k in range(i+1,d):
+                ET[k,n1:d]=ETi*ET[k,jz] + ET[k,n1:d] # EROs
+
+            id[i]=-id[i]
+            if num_npr==(r-n1):
+                break  # exit i loop
 
 
+    return id 
 
+def efupdate(n1,n2,p,r,id,A0,E0):
+    """ update row echelon form to get lb f(Y)
+        
+        Assumption: n1 < rank X
+        Input:
+        n1 : # flag 1
+        n2 : # flag 2
+        id with pivot column indices, with some negative indices
+        id[i] < 0 means x[-id[i]] is a new basic variable i.e. x[-id[i]]=/0
+        id[i] > 0 means x[id[i]] is a non basic variable i.e. x[id[i]]=0
+        A0 : [Q|d] the original augmented matrix
+        E0 : master simplified echelon form of A0 of size r x p+1, E0=[U *] with the 
+        diagonal entries of the upper triangular U equal to 1. Now row switches allowed to
+        get E0
+        Output:
+        xstar : solution of the linear system after updating echelon form and back subs 
+    """
+    import numpy as np
 
+    def updatelowerblock(A0):
+        """ 
+        Input:
+        A0 = [U *; * *]
+        Output:
+        E0 = [U | rhs] is in rref
+        """
+        E0=A0  # initialization
+        q=d+1  # no. of col of A0
+        # reduce the lower block to zero for the first n1 cols
+        for j in range(n1):
+            E0i=-E0[j,j:q]
+            for i in range(n1,d):
+                E0[i,j:q]=E0i*E0[i,j] + E0[i,j:q]
+
+        return E0
+
+    d=min(n1+n2,r)
+    cia=np.zeros(d) # initialization
+    cia[:n1]=np.array(range(n1)) # first n1 indices are flag 1
+    for j in range(n1,d):
+        if j<=(r-1) and id[j]<0:
+            cia[j]=-id[j]
+        
+    # drop the nonbasic cols correspond to flag 2 in the box and add RHS of the system [Q|d]
+    tempE=np.hstack( ( E0[:,cia],E0[:,p]) ) 
+    # recycle the first n1 rows of E0 and add last r-n1 rows of A0
+    E=np.vstack( (tempE[cia[:n1],:],   A0[cia[n1:d], np.hstack((cia,p)) ] ) )
+    E0=updatelowerblock(E)
+    xr=backsub(d,d,E0,range(d)) # back sub
+    xstar=np.zeros((p,1)) # initialization
+    xstar[cia]=xr
+
+    return xstar
+    
 def fx(x,A,b,c):
     """ fx=0.5 xAx + bx +c
     
@@ -208,3 +342,4 @@ def backsub(n,num_piv,E,idx_piv):
         #print('x:',x)
 
     return x
+
