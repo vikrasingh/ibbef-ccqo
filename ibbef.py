@@ -6,15 +6,8 @@ def main(p,n,y,X,A,Q,D,b,c,k,x0,xrelax):
     import sys
     import numpy as np
     from scipy import linalg
+    from scipy import minimize
     import heapq
-
-    def getklargest(given_list,select_k):
-        """ Extract a sub array of size kx1 with k largest entries
-    
-        """
-        indices_k_largest=np.argpartition(given_list,-select_k)[-select_k:]
-        list_k_largest=given_list[indices_k_largest]
-        return indices_k_largest,list_k_largest
 
     epsilon=sys.float_info.epsilon    
     pivtol=max(p,n)*epsilon*np.linalg.norm( A, ord=np.inf)  #  tol to check non-zero pivot for echelon form
@@ -141,7 +134,7 @@ def main(p,n,y,X,A,Q,D,b,c,k,x0,xrelax):
             break
         
         # select a new box to process
-        V=heapq.heappop(L) # V[0]=fxlb, V[1]=box, V[2]=#0, V[3]=#1, V[4]=#2, V[5]=xlb
+        Y=heapq.heappop(L) # V[0]=fxlb, V[1]=box, V[2]=#0, V[3]=#1, V[4]=#2, V[5]=xlb
         num_box=num_box-1
         branch()
 
@@ -149,21 +142,21 @@ def main(p,n,y,X,A,Q,D,b,c,k,x0,xrelax):
             """ partition the current box and process the child boxes
 
             """
-            par_dir=np.arange(V[1].size)[V[1]==1][::-1]  # indices of partition direction in decreasing order
+            par_dir=np.arange(Y[1].size)[Y[1]==1][::-1]  # indices of partition direction in decreasing order
             stop_par=0  # to stop the partition loop
-            isDC1=0     # flag to avoid checking DC2 for every flag 2 child box
-            uplimit=p-k-V[2] 
+            isDC2true=0     # flag to avoid checking DC2 for every flag 2 child box
+            uplimit=p-k-Y[2] 
             num_child=min(uplimit,float('inf'))
 
             for j in range(num_child):
 
                 jhat=par_dir[j]  # partition index
-                temp=V[1]
+                temp=Y[1]
                 temp[jhat]=0    # child box with 0 flag
-                V0=(temp , V[2]+1, V[3]-1, V[4]) # initialization 
-                temp=V[1]
+                V0=(temp , Y[2]+1, Y[3]-1, Y[4]) # initialization 
+                temp=Y[1]
                 temp[jhat]=2   # child box with 2 flag
-                V2=(temp , V[2], V[3]-1, V[4]+1)
+                V2=(temp , Y[2], Y[3]-1, Y[4]+1)
 
                 for ichild in range(2):
 
@@ -193,9 +186,42 @@ def main(p,n,y,X,A,Q,D,b,c,k,x0,xrelax):
                             stop_par=1 # stop the j loop
                             continue # with the next ichild iteration
 
-                        Z1=fxlb + V0 + xlb
+                        Y=(fxlb) + V0 + (xlb)
 
                     else: # box with 2 flag
+
+                        # check DC2
+                        if j==0:
+                            if Y[4]+1==k:
+                                isDC2true=1 # DC2 is satisfied for all the subsequent child boxes,check it only once
+
+                        if isDC2true==1:
+                            # call lb QM
+                            xhat,fxhat=quad_min(p,V2[0],A,b,c,xrelax)
+                            # update xbest, fbest if possible
+                            if fxhat<fbest:
+                                xbest=xhat
+                                fbest=fxhat
+                                continue # with the next iter of j loop
+
+                            # call feasiblity sampling
+                            xtilde,fxtilde=getfeasiblept(p,k,V2[0],A,b,c,xrelax,absxrelax)
+                            if fxtilde<fbest:
+                                xbest=xtilde
+                                fbest=fxtilde
+                            
+                            xlb=Y[5]
+                            fxlb=Y[0]
+
+                            # check DC1
+                            if fbest<=fxlb:
+                                continue # discard the box
+
+                            heapq.heappush( L, (fxlb) + V2 + (xlb) )  # add the V2 box to the list
+
+
+                                
+
 
 
 
@@ -308,22 +334,6 @@ def efupdate(n1,n2,p,r,id,A0,E0):
 
     return xstar
     
-def fx(x,A,b,c):
-    """ fx=0.5 xAx + bx +c
-    
-     """
-    #print('Ain:',A)
-    #print('bin:',b)
-    #print('cin:',c)
-    #print('xin:',x)
-    #print('fx:',0.5*(x.T@A@x)+b.T@x+c)
-    #print('fx:',b.T@x)
-    #Qx = Q.T @ x
-    #value=(Qx.T @ (D*Qx)) + b.T @ x + c
-    value=0.5*(x.T @ (A @ x) ) + b.T @ x + c 
-
-    return value
-
 def backsub(n,num_piv,E,idx_piv):
 
     import numpy as np
@@ -342,4 +352,70 @@ def backsub(n,num_piv,E,idx_piv):
         #print('x:',x)
 
     return x
+    
+def fx(x,A,b,c):
+    """ fx=0.5 xAx + bx +c
+    
+     """
+    #print('Ain:',A)
+    #print('bin:',b)
+    #print('cin:',c)
+    #print('xin:',x)
+    #print('fx:',0.5*(x.T@A@x)+b.T@x+c)
+    #print('fx:',b.T@x)
+    #Qx = Q.T @ x
+    #value=(Qx.T @ (D*Qx)) + b.T @ x + c
+    value=0.5 * x.T @ A @ x  + b.T @ x + c 
 
+    return value
+
+def grad_fun(x,A,b):
+    "g = Ax+b"
+    value= A @ x + b
+    return value
+
+def quad_min(p,box,A,b,c,x0):
+    " quadratic minimization using conjugate gradient method"
+
+    import numpy as np
+    from scipy.optimize import minimize
+    
+    supp=np.where(box!=0) # find the indices of flag 1 and flag 2
+    start_pt=x0[supp]
+    Ahat=A[np.ix_(supp,supp)]
+    bhat=b[supp]
+    obj=minimize( fx, start_pt, method='CG', jac=grad_fun, hess=Ahat)
+    xout=np.zeros(p,1)
+    xout[supp]=obj.x
+    fout=obj.fun
+
+    return xout, fout
+
+def getfeasiblept(p,k,box,A,b,c,xrelax,absxrelax):
+    "Find a feasible point"
+    
+    import numpy as np
+    from scipy.optimize import minimize
+
+    supp1=np.where(box!=0) # find the indices of flag 1 and flag 2
+    local_supp,_=getklargest(absxrelax[supp1],k)
+    supp=supp1[local_supp]
+    start_pt=xrelax[supp]
+    Ahat=A[np.ix_(supp,supp)]
+    bhat=b[supp]
+    obj=minimize( fx, start_pt, method='CG', jac=grad_fun, hess=Ahat)
+    xout=np.zeros(p,1)
+    xout[supp]=obj.x
+    fout=obj.fun
+
+    return xout,fout
+    
+def getklargest(given_list,select_k):
+        """ Extract a sub array of size kx1 with k largest entries
+    
+        """
+        import numpy as np
+
+        indices_k_largest=np.argpartition(given_list,-select_k)[-select_k:]
+        list_k_largest=given_list[indices_k_largest]
+        return indices_k_largest,list_k_largest
