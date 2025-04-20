@@ -207,7 +207,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
                         stop_par=1 # stop the j loop
                         continue # with the next ichild iteration
 
-                    Y=(fxlb) + V0 + (xlb)
+                    Y=(fxlb,) + V0 + (xlb,)
 
                 else: # box with 2 flag
 
@@ -239,7 +239,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
                     if fbest<=fxlb:
                         continue # discard the box
 
-                    heapq.heappush( L, (fxlb) + V2 + (xlb) )  # add the V2 box to the list
+                    heapq.heappush( L, (fxlb,) + V2 + (xlb,) )  # add the V2 box to the list
             
 
     
@@ -396,9 +396,14 @@ def fx(x,A,b,c):
 
     return value
 
-def grad_fun(x,A,b):
+def quad_fun(x,A,b,c):
+    " x is 1D array"
+    value= 0.5 * x @ A @ x.T + x @ b.T + c
+    return value
+
+def grad_fun(x,A,b,c):
     "g = Ax+b"
-    value= A @ x + b
+    value= x @ A + b
     return value
 
 def quad_min(p,box,A,b,c,x0):
@@ -407,13 +412,15 @@ def quad_min(p,box,A,b,c,x0):
     import numpy as np
     from scipy.optimize import minimize
     
-    supp=np.where(box!=0) # find the indices of flag 1 and flag 2
+    supp=np.where(box!=0)[0] # find the indices of flag 1 and flag 2
     start_pt=x0[supp]
     Ahat=A[np.ix_(supp,supp)]
     bhat=b[supp]
-    obj=minimize( fx, start_pt, method='CG', jac=grad_fun, hess=Ahat)
-    xout=np.zeros(p,1)
-    xout[supp]=obj.x
+    bhat=np.reshape(bhat,(1,-1)) # convert into a 1D array
+
+    obj=minimize( quad_fun, start_pt, method='CG', jac=grad_fun)
+    xout=np.zeros((p,1))
+    xout[supp]=np.reshape(obj.x,(-1,1))
     fout=obj.fun
 
     return xout, fout
@@ -424,15 +431,20 @@ def getfeasiblept(p,k,box,A,b,c,xrelax,absxrelax):
     import numpy as np
     from scipy.optimize import minimize
 
-    supp1=np.where(box!=0) # find the indices of flag 1 and flag 2
+    supp1=np.where(box!=0)[0] # find the indices of flag 1 and flag 2
+    print('supp1:',supp1)
     local_supp,_=getklargest(absxrelax[supp1],k)
+    print('local_supp:',local_supp)
     supp=supp1[local_supp]
     start_pt=xrelax[supp]
+    start_pt=np.reshape(start_pt,(1,-1)) # convert into a 1D array
     Ahat=A[np.ix_(supp,supp)]
     bhat=b[supp]
-    obj=minimize( fx, start_pt, method='CG', jac=grad_fun, hess=Ahat)
-    xout=np.zeros(p,1)
-    xout[supp]=obj.x
+    bhat=np.reshape(bhat,(1,-1))
+    #print('bhat:',bhat)
+    obj=minimize( quad_fun, start_pt[0], (Ahat,bhat[0],c) , method='CG', jac=grad_fun)
+    xout=np.zeros((p,1))
+    xout[supp]=np.reshape(obj.x,(-1,1))
     fout=obj.fun
 
     return xout,fout
