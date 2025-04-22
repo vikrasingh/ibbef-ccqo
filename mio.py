@@ -60,34 +60,20 @@ def main(p,n,y,X,A,b,c,k,low,up,xrelax):
     XX = X.T @ X
     I = np.eye(p)
     Atemp = np.vstack(( np.hstack((I,-up * I)) , np.hstack((-I,low * I)) ))
-    print('Atemp:',Atemp)
     rvec = np.hstack((np.zeros((1,p)),np.ones((1,p))))
-    print('rvec:',rvec)
     A = np.vstack((Atemp,rvec))  # A x <= rhs , A is the linear constraint matrix
-    print('A:',A)
     sense = list((2*p+1)*GRB.LESS_EQUAL)  
-    print('yX:',-2*(y.T @ X)[0]) 
     c = np.hstack((-2*(y.T @ X)[0],np.zeros(p))) # the linear term in the objective function
-    print('c:',c)
-    rhs = np.hstack((np.zeros((1,2*p))[0],[k]))
-    print('rhs:',rhs)
-    #Q = sp.csr_matrix( sp.block_diag((XX,np.zeros((p,p)))) )
+    rhs = np.hstack((np.zeros(2*p),[k]))
     block_diag_matrix=sp.block_diag((XX,np.zeros((p,p))))
-    Q = block_diag_matrix.toarray()
-    print('Q:',Q)
-    print('Qij:',Q[0][0])
-    print('low.T:',low.T[0])
-    print('zero:',np.zeros(p))
+    Q = block_diag_matrix.toarray() # convert sparse matrix to a dense matrix
     lb = np.hstack((low.T[0],np.zeros(p)))
     ub = np.hstack((up.T[0],np.ones(p)))
     vtype = np.hstack( (list(p*GRB.CONTINUOUS),list(p*GRB.BINARY)) )
-    print('vtype:',vtype)
-    fespt=np.hstack((np.ones(k),np.zeros(p-k)))
+    fespt=np.hstack((np.ones(k),np.zeros(p-k))) # feasible point with k non zero entries
     sol = np.hstack((fespt,fespt!=0))
-    print('sol:',sol)
     num_rows=2*p+1
     num_cols=2*p
-    print('nrows,ncols:',num_rows,num_cols)
     # Optimize
     success = dense_optimize(num_rows, num_cols, c, Q, A, sense, rhs, lb, ub, vtype, sol)
 
