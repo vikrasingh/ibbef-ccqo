@@ -1,5 +1,5 @@
 # solving bss using mio
-def main(p,n,y,X,A,b,c,k,low,up,xrelax):
+def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax):
     """ Solving BSS using Gurobi
         MATLAB implementation of the bss in R package, following the code from Ryan Tibshirani's github page
        https://github.com/ryantibs/best-subset/blob/master/bestsubset/R/bs.R
@@ -46,8 +46,10 @@ def main(p,n,y,X,A,b,c,k,low,up,xrelax):
         model.optimize()
 
         # Write model to a file
-        model.write("bss.lp")
-
+        #model.write("bss.lp")
+        return model
+    
+        print('model:',model)
         if model.status == GRB.OPTIMAL:
             x = model.getAttr("X", vars)
             for i in range(cols):
@@ -75,9 +77,17 @@ def main(p,n,y,X,A,b,c,k,low,up,xrelax):
     num_rows=2*p+1
     num_cols=2*p
     # Optimize
-    success = dense_optimize(num_rows, num_cols, c, Q, A, sense, rhs, lb, ub, vtype, sol)
+    optimized_model = dense_optimize(num_rows, num_cols, c, Q, A, sense, rhs, lb, ub, vtype, sol)
 
-    if success:
-        print('xmio:',sol)
+    if optimized_model.status==GRB.OPTIMAL:
+        x = optimized_model.getAttr("X", vars) 
+        print('xmio:',x[0:p])
+
+    xout = x
+    print('bx:', xout@lin)
+    print('xAx:',xout@Hess@xout.T)
+    fxout = 0.5 * (xout @ Hess @ xout.T) + xout @ lin + const
+
+    return xout, fxout
 
 
