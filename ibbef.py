@@ -19,9 +19,9 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     ipiv1=[i for i in range(p) if i not in ipiv0]
     
     absxrelax=np.abs(xrelax) # absolute value of xrelax array
-    print('A:',A)
-    print('ipiv0:',ipiv0)
-    print('ipiv1:',ipiv1)
+    #print('A:',A)
+    #print('ipiv0:',ipiv0)
+    #print('ipiv1:',ipiv1)
     #print('A[ipiv0,ipiv0]',A[np.ix_(ipiv0,ipiv0)])
     #print('A[ipiv0,ipiv1]',A[np.ix_(ipiv0,ipiv1)])
     #print('A[ipiv1,ipiv0]',A[np.ix_(ipiv1,ipiv0)])
@@ -39,8 +39,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
        X=np.hstack( (X[:,ipiv0],X[:,ipiv1]) )
        xrelax=np.concatenate( (xrelax[ipiv0],xrelax[ipiv1]) )
 
-    print('A:',A)
-    print('b:',b)
+    #print('A:',A)
     #print('X:',X)
     #print('xrelax:',xrelax)
 

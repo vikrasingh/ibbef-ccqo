@@ -33,7 +33,7 @@ def main(p,n,y,X,A,b,c,k,low,up,xrelax):
         obj = gp.QuadExpr()
         for i in range(cols):
             for j in range(cols):
-                print('Qij:',Q[i][j])
+                #print('Qij:',Q[i][j])
                 if Q[i][j] != 0:
                     obj += Q[i][j] * vars[i] * vars[j]
         for j in range(cols):
@@ -59,29 +59,39 @@ def main(p,n,y,X,A,b,c,k,low,up,xrelax):
     # Put model data into dense matrices
     XX = X.T @ X
     I = np.eye(p)
-    Atemp = np.vstack(( np.hstack((I,-up * I)) , np.hstack((I,-low * I)) ))
+    Atemp = np.vstack(( np.hstack((I,-up * I)) , np.hstack((-I,low * I)) ))
     print('Atemp:',Atemp)
     rvec = np.hstack((np.zeros((1,p)),np.ones((1,p))))
     print('rvec:',rvec)
     A = np.vstack((Atemp,rvec))  # A x <= rhs , A is the linear constraint matrix
-    sense = list((2*p+1)*GRB.LESS_EQUAL)   
-    c = np.vstack((-2*(X.T @ y),np.zeros((p,1)))) # the linear term in the objective function
-    rhs = np.vstack((np.zeros((2*p,1)),k))
+    print('A:',A)
+    sense = list((2*p+1)*GRB.LESS_EQUAL)  
+    print('yX:',-2*(y.T @ X)[0]) 
+    c = np.hstack((-2*(y.T @ X)[0],np.zeros(p))) # the linear term in the objective function
+    print('c:',c)
+    rhs = np.hstack((np.zeros((1,2*p))[0],[k]))
+    print('rhs:',rhs)
     #Q = sp.csr_matrix( sp.block_diag((XX,np.zeros((p,p)))) )
     block_diag_matrix=sp.block_diag((XX,np.zeros((p,p))))
     Q = block_diag_matrix.toarray()
     print('Q:',Q)
     print('Qij:',Q[0][0])
-    lb = np.vstack((low,np.zeros((p,1))))
-    ub = np.vstack((up,np.zeros((p,1))))
+    print('low.T:',low.T[0])
+    print('zero:',np.zeros(p))
+    lb = np.hstack((low.T[0],np.zeros(p)))
+    ub = np.hstack((up.T[0],np.ones(p)))
     vtype = np.hstack( (list(p*GRB.CONTINUOUS),list(p*GRB.BINARY)) )
-    sol = np.vstack((xrelax,xrelax!=0))
+    print('vtype:',vtype)
+    fespt=np.hstack((np.ones(k),np.zeros(p-k)))
+    sol = np.hstack((fespt,fespt!=0))
+    print('sol:',sol)
     num_rows=2*p+1
     num_cols=2*p
+    print('nrows,ncols:',num_rows,num_cols)
     # Optimize
     success = dense_optimize(num_rows, num_cols, c, Q, A, sense, rhs, lb, ub, vtype, sol)
 
     if success:
-        print('xmio:',sol[0])
+        print('xmio:',sol)
 
 
