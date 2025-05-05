@@ -44,17 +44,20 @@ def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax):
 
         # Solve
         model.optimize()
-
+        return model, vars
+    
         # Write model to a file
         #model.write("bss.lp")
-        return model
-    
-        print('model:',model)
+        
+        #print('model:',model)
         if model.status == GRB.OPTIMAL:
             x = model.getAttr("X", vars)
-            for i in range(cols):
-                solution[i] = x[i]
-            return True
+            print('x:',x)
+            print('x type:',np.dtype(x.vars))
+            for i in range(rows):
+                 for j in range(cols):
+                     print(f"x[{i},{j}] = {x[i, j].vars}")
+            return model
         else:
             return False
         
@@ -77,17 +80,19 @@ def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax):
     num_rows=2*p+1
     num_cols=2*p
     # Optimize
-    optimized_model = dense_optimize(num_rows, num_cols, c, Q, A, sense, rhs, lb, ub, vtype, sol)
+    optimized_model,vars = dense_optimize(num_rows, num_cols, c, Q, A, sense, rhs, lb, ub, vtype, sol)
 
     if optimized_model.status==GRB.OPTIMAL:
         x = optimized_model.getAttr("X",vars)
-        print('xmio:',sol[0:p])
+        print('xmio:',x[0:p])
 
-    xout = x
-    print('bx:', xout@lin)
-    print('xAx:',xout@Hess@xout.T)
-    fxout = 0.5 * (xout @ Hess @ xout.T) + xout @ lin + const
 
+    xout = np.reshape(x[0:p],(-1,1))   # make it a col array
+    print('bx:', xout.T @ lin)
+    print('xAx:',xout.T @ Hess @xout )
+    fxout = 0.5 * (xout.T @ Hess @ xout) + xout.T @ lin + const
+    print('fxout:',fxout)
+    
     return xout, fxout
 
 

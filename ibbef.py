@@ -20,8 +20,8 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     
     absxrelax=np.abs(xrelax) # absolute value of xrelax array
     #print('A:',A)
-    #print('ipiv0:',ipiv0)
-    #print('ipiv1:',ipiv1)
+    print('ipiv0:',ipiv0)
+    print('ipiv1:',ipiv1)
     #print('A[ipiv0,ipiv0]',A[np.ix_(ipiv0,ipiv0)])
     #print('A[ipiv0,ipiv1]',A[np.ix_(ipiv0,ipiv1)])
     #print('A[ipiv1,ipiv0]',A[np.ix_(ipiv1,ipiv0)])
@@ -82,15 +82,15 @@ def main(p,n,y,X,A,b,c,k,xrelax):
         print('No. of pivot cols of X from custom echelon form is not same as qr')
 
     print('npiv0, npiv00:',npiv0,npiv00)
-    #print('CE0:',CE0)
+    print('CE0:',CE0)
     Ab=np.hstack((A,-b))   # augmented matrix for the first order linear system
-    #print('Ab:',Ab)
+    print('Ab:',Ab)
     niter=0
     num_box=1
     xbest=np.zeros((p,1)) # intialize xbest
     supp0,xbest[supp0]=getklargest(absxrelax,k)
     fbest=fx(xbest[supp0],A[np.ix_(supp0,supp0)],b[supp0],c)
-    #print('xbest,fbest:',xbest,fbest)
+    print('xbest,fbest:',xbest,fbest)
     B0=np.ones(p,dtype=int) # initial box of integer ones
 
     def rowech():
@@ -110,16 +110,15 @@ def main(p,n,y,X,A,b,c,k,xrelax):
 
 
     E0=rowech()
-    #print('E0:',E0)
+    print('E0:',E0)
     xlb=backsub(p,npiv0,E0,np.array(range(npiv0)))
     #xlb[ipiv0]=xlb
     fxlb=fx(xlb,A,b,c)
     xhat0=xlb
     fxhat0=fxlb
-    #print('xlb :',xlb)
-    #print('fxlb:',fxlb)
-    #print('size fxlb:',np.size(fxlb))
-
+    print('xlb :',xlb)
+    print('fxlb:',fxlb)
+    
     # Initialize the list L
     L = []
     heapq.heappush( L, (fxlb, B0, 0, p, 0, xlb) )  # add the intial box to the list
@@ -136,111 +135,9 @@ def main(p,n,y,X,A,b,c,k,xrelax):
         Y=heapq.heappop(L) # V[0]=fxlb, V[1]=box, V[2]=#0, V[3]=#1, V[4]=#2, V[5]=xlb
         num_box=num_box-1
 
-        par_dir=np.arange(Y[1].size)[Y[1]==1][::-1]  # indices of partition direction in decreasing order
-        stop_par=0  # to stop the partition loop
-        isDC2true=0     # flag to avoid checking DC2 for every flag 2 child box
-        uplimit=p-k-Y[2] 
-        num_child=min(uplimit,float('inf'))
-
-        for j in range(num_child):
-
-            jhat=par_dir[j]  # partition index
-            temp=Y[1]
-            temp[jhat]=0    # child box with 0 flag
-            V0=(temp , Y[2]+1, Y[3]-1, Y[4]) # initialization 
-            temp=Y[1]
-            temp[jhat]=2   # child box with 2 flag
-            V2=(temp , Y[2], Y[3]-1, Y[4]+1)
-
-            for ichild in range(2):
-
-                if ichild==0: # box with 0 flag
-                    if j==(uplimit-1): # reached leaf node with k flag 1 in it
-                        # find the feasible point
-                        if V0[2]<npiv0: # if #flag 1 < rank X
-                            if V0[3]==0: # if there is no flag 2 in the box
-                                xhat=backsub(p, V0[2], E0, range(V0[2]))
-
-                            else:
-                                id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
-                                xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
-
-                            fxhat=fx(xhat, A, b, c)
-
-                        else:
-                            xhat=xhat0
-                            fxhat=fxhat0
-
-                        # update xbest ,fbest if possible
-                        if fxhat<fbest:
-                            xbest=xhat
-                            fbest=fxhat
-                            
-                        continue # with the next ichild iteration
-
-                    # sampling call
-                    xtilde,fxtilde=getfeasiblept(p,k,V0[0],A,b,c,xrelax,absxrelax)
-                    if fxtilde<fbest:
-                        xbest=xtilde
-                        fbest=fxtilde
-
-                    # inclusion function call
-                    if V0[2] < npiv0: #  if #1 < npiv0
-                        if V0[3]==0: # no flag 0 in the box
-                            xhat=backsub(p, V0[2], E0, range(V0[2]))
-                        else:
-                            id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
-                            xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
-                            
-                        fxhat=fx(xhat,A,b,c)
-
-                    else: # if #flag 1 >= rank X
-                            xhat=xhat0
-                            fxhat=fxhat0
-                        
-                    xlb=xhat
-                    fxlb=fxhat0
-
-                    # check DC1
-                    if fbest<=fxlb:
-                        stop_par=1 # stop the j loop
-                        continue # with the next ichild iteration
-
-                    Y=(fxlb,) + V0 + (xlb,)
-
-                else: # box with 2 flag
-
-                    # check DC2
-                    if j==0:
-                        if Y[4]+1==k:
-                            isDC2true=1 # DC2 is satisfied for all the subsequent child boxes,check it only once
-
-                    if isDC2true==1:
-                        # call lb QM
-                        xhat,fxhat=quad_min(p,V2[0],A,b,c,xrelax)
-                        # update xbest, fbest if possible
-                        if fxhat<fbest:
-                            xbest=xhat
-                            fbest=fxhat
-                        
-                        continue # with the next iter of j loop
-
-                    # call feasiblity sampling
-                    xtilde,fxtilde=getfeasiblept(p,k,V2[0],A,b,c,xrelax,absxrelax)
-                    if fxtilde<fbest:
-                        xbest=xtilde
-                        fbest=fxtilde
-                            
-                    xlb=Y[5]
-                    fxlb=Y[0]
-
-                    # check DC1
-                    if fbest<=fxlb:
-                        continue # discard the box
-
-                    heapq.heappush( L, (fxlb,) + V2 + (xlb,) )  # add the V2 box to the list
+        # branch over Y
+        fbest, xbest, L = branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrelax,npiv0)
             
-
     
     # final output
     xout=np.zeros((p,1))
@@ -250,7 +147,121 @@ def main(p,n,y,X,A,b,c,k,xrelax):
 
     return xout, fout
                                 
+def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrelax,npiv0):
+    """
+    
+    """
+    import sys
+    import numpy as np
+    from scipy import linalg
+    from scipy.optimize import minimize
+    import heapq
 
+    par_dir=np.arange(Y[1].size)[Y[1]==1][::-1]  # indices of partition direction in decreasing order
+    stop_par=0  # to stop the partition loop
+    isDC2true=0     # flag to avoid checking DC2 for every flag 2 child box
+    uplimit=p-k-Y[2] 
+    num_child=min(uplimit,float('inf'))
+
+    for j in range(num_child):
+
+        jhat=par_dir[j]  # partition index
+        temp=Y[1]
+        temp[jhat]=0    # child box with 0 flag
+        V0=(temp , Y[2]+1, Y[3]-1, Y[4]) # initialization 
+        temp=Y[1]
+        temp[jhat]=2   # child box with 2 flag
+        V2=(temp , Y[2], Y[3]-1, Y[4]+1)
+
+        for ichild in range(2):
+
+            if ichild==0: # box with 0 flag
+                if j==(uplimit-1): # reached leaf node with k flag 1 in it
+                    # find the feasible point
+                    if V0[2]<npiv0: # if #flag 1 < rank X
+                        if V0[3]==0: # if there is no flag 2 in the box
+                            xhat=backsub(p, V0[2], E0, range(V0[2]))
+
+                        else:
+                            id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
+                            xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
+
+                        fxhat=fx(xhat, A, b, c)
+
+                    else:
+                        xhat=xhat0
+                        fxhat=fxhat0
+
+                    # update xbest ,fbest if possible
+                    if fxhat<fbest:
+                        xbest=xhat
+                        fbest=fxhat
+                            
+                    continue # with the next ichild iteration
+
+                # sampling call
+                xtilde,fxtilde=getfeasiblept(p,k,V0[0],A,b,c,xrelax,absxrelax)
+                if fxtilde<fbest:
+                    xbest=xtilde
+                    fbest=fxtilde
+
+                # inclusion function call
+                if V0[2] < npiv0: #  if #1 < npiv0
+                    if V0[3]==0: # no flag 0 in the box
+                        xhat=backsub(p, V0[2], E0, range(V0[2]))
+                    else:
+                        id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
+                        xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
+                            
+                    fxhat=fx(xhat,A,b,c)
+
+                else: # if #flag 1 >= rank X
+                        xhat=xhat0
+                        fxhat=fxhat0
+                        
+                xlb=xhat
+                fxlb=fxhat0
+
+                # check DC1
+                if fbest<=fxlb:
+                    stop_par=1 # stop the j loop
+                    continue # with the next ichild iteration
+
+                Y=(fxlb,) + V0 + (xlb,)
+
+            else: # box with 2 flag
+
+                # check DC2
+                if j==0:
+                    if Y[4]+1==k:
+                        isDC2true=1 # DC2 is satisfied for all the subsequent child boxes,check it only once
+
+                if isDC2true==1:
+                    # call lb QM
+                    xhat,fxhat=quad_min(p,V2[0],A,b,c,xrelax)
+                    # update xbest, fbest if possible
+                    if fxhat<fbest:
+                        xbest=xhat
+                        fbest=fxhat
+                        
+                    continue # with the next iter of j loop
+
+                # call feasiblity sampling
+                xtilde,fxtilde=getfeasiblept(p,k,V2[0],A,b,c,xrelax,absxrelax)
+                if fxtilde<fbest:
+                    xbest=xtilde
+                    fbest=fxtilde
+                            
+                xlb=Y[5]
+                fxlb=Y[0]
+
+                # check DC1
+                if fbest<=fxlb:
+                    continue # discard the box
+
+                heapq.heappush( L, (fxlb,) + V2 + (xlb,) )  # add the V2 box to the list
+    
+    return fbest, xbest, L
 
 def newpivcol(n1,n2,p,r,n,Y,X,CE0):
     """ Determine new pivot columns among the flag 2 columns
