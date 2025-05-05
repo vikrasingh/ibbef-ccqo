@@ -80,8 +80,8 @@ def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax):
     optimized_model = dense_optimize(num_rows, num_cols, c, Q, A, sense, rhs, lb, ub, vtype, sol)
 
     if optimized_model.status==GRB.OPTIMAL:
-        x = optimized_model.getAttr("X", vars) 
-        print('xmio:',x[0:p])
+        x = optimized_model.getAttr("X",vars)
+        print('xmio:',sol[0:p])
 
     xout = x
     print('bx:', xout@lin)

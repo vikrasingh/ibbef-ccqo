@@ -110,7 +110,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
 
 
     E0=rowech()
-    print('E0:',E0)
+    #print('E0:',E0)
     xlb=backsub(p,npiv0,E0,np.array(range(npiv0)))
     #xlb[ipiv0]=xlb
     fxlb=fx(xlb,A,b,c)
@@ -431,9 +431,9 @@ def getfeasiblept(p,k,box,A,b,c,xrelax,absxrelax):
     from scipy.optimize import minimize
 
     supp1=np.where(box!=0)[0] # find the indices of flag 1 and flag 2
-    print('supp1:',supp1)
+    #print('supp1:',supp1)
     local_supp,_=getklargest(absxrelax[supp1],k)
-    print('local_supp:',local_supp)
+    #print('local_supp:',local_supp)
     supp=supp1[local_supp]
     start_pt=xrelax[supp]
     start_pt=np.reshape(start_pt,(1,-1)) # convert into a 1D array
