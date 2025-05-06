@@ -18,7 +18,6 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     ipiv0=ipiv0[0:npiv0]
     ipiv1=[i for i in range(p) if i not in ipiv0]
     
-    absxrelax=np.abs(xrelax) # absolute value of xrelax array
     #print('A:',A)
     print('ipiv0:',ipiv0)
     print('ipiv1:',ipiv1)
@@ -39,6 +38,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
        X=np.hstack( (X[:,ipiv0],X[:,ipiv1]) )
        xrelax=np.concatenate( (xrelax[ipiv0],xrelax[ipiv1]) )
 
+    absxrelax=np.abs(xrelax) # absolute value of xrelax array
     #print('A:',A)
     #print('X:',X)
     #print('xrelax:',xrelax)
@@ -82,16 +82,18 @@ def main(p,n,y,X,A,b,c,k,xrelax):
         print('No. of pivot cols of X from custom echelon form is not same as qr')
 
     print('npiv0, npiv00:',npiv0,npiv00)
-    print('CE0:',CE0)
+    #print('CE0:',CE0)
     Ab=np.hstack((A,-b))   # augmented matrix for the first order linear system
-    print('Ab:',Ab)
+    #print('Ab:',Ab)
+    B0=np.ones(p,dtype=int) # initial box of integer ones
     niter=0
     num_box=1
-    xbest=np.zeros((p,1)) # intialize xbest
-    supp0,xbest[supp0]=getklargest(absxrelax,k)
-    fbest=fx(xbest[supp0],A[np.ix_(supp0,supp0)],b[supp0],c)
+    xbest,fbest=getfeasiblept(p,k,B0,A,b,c,xrelax,absxrelax)
+    #xbest=np.zeros((p,1)) # intialize xbest
+    #supp0,xbest[supp0]=getklargest(absxrelax,k)
+    #fbest=fx(xbest[supp0],A[np.ix_(supp0,supp0)],b[supp0],c)
     print('xbest,fbest:',xbest,fbest)
-    B0=np.ones(p,dtype=int) # initial box of integer ones
+
 
     def rowech():
         """ row reduced echelon form
@@ -110,14 +112,14 @@ def main(p,n,y,X,A,b,c,k,xrelax):
 
 
     E0=rowech()
-    print('E0:',E0)
+    #print('E0:',E0)
     xlb=backsub(p,npiv0,E0,np.array(range(npiv0)))
     #xlb[ipiv0]=xlb
     fxlb=fx(xlb,A,b,c)
     xhat0=xlb
     fxhat0=fxlb
-    print('xlb :',xlb)
-    print('fxlb:',fxlb)
+    #print('xlb :',xlb)
+    #print('fxlb:',fxlb)
     
     # Initialize the list L
     L = []
@@ -136,7 +138,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
         num_box=num_box-1
 
         # branch over Y
-        fbest, xbest, L = branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrelax,npiv0)
+        num_box, fbest, xbest, L = branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrelax,npiv0,num_box)
             
     
     # final output
@@ -147,7 +149,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
 
     return xout, fout
                                 
-def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrelax,npiv0):
+def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrelax,npiv0,num_box):
     """
     
     """
@@ -158,6 +160,7 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
     import heapq
 
     par_dir=np.arange(Y[1].size)[Y[1]==1][::-1]  # indices of partition direction in decreasing order
+    print('par_dir:',par_dir)
     stop_par=0  # to stop the partition loop
     isDC2true=0     # flag to avoid checking DC2 for every flag 2 child box
     uplimit=p-k-Y[2] 
@@ -166,16 +169,21 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
     for j in range(num_child):
 
         jhat=par_dir[j]  # partition index
-        temp=Y[1]
-        temp[jhat]=0    # child box with 0 flag
-        V0=(temp , Y[2]+1, Y[3]-1, Y[4]) # initialization 
-        temp=Y[1]
-        temp[jhat]=2   # child box with 2 flag
-        V2=(temp , Y[2], Y[3]-1, Y[4]+1)
+        print('Y:',Y[1])
+        tempV0=Y[1]
+        tempV0[jhat]=0    # child box with 0 flag
+        print('tempV0:',tempV0)
+        V0=(tempV0 , Y[2]+1, Y[3]-1, Y[4]) # initialization 
+        print('V0:',V0)
+        tempV2=Y[1]
+        tempV2[jhat]=2   # child box with 2 flag
+        V2=(tempV2 , Y[2], Y[3]-1, Y[4]+1)
+        print('j,jhat,V2:',j,jhat,V2[0])
 
         for ichild in range(2):
 
             if ichild==0: # box with 0 flag
+
                 if j==(uplimit-1): # reached leaf node with k flag 1 in it
                     # find the feasible point
                     if V0[2]<npiv0: # if #flag 1 < rank X
@@ -228,6 +236,7 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                     continue # with the next ichild iteration
 
                 Y=(fxlb,) + V0 + (xlb,)
+                print('Y set again:',Y)
 
             else: # box with 2 flag
 
@@ -259,9 +268,15 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                 if fbest<=fxlb:
                     continue # discard the box
 
+                num_box = num_box+1
+                print('V2 added:',V2)
                 heapq.heappush( L, (fxlb,) + V2 + (xlb,) )  # add the V2 box to the list
-    
-    return fbest, xbest, L
+        
+        if stop_par==1: # child box with flag 1 got deleted using DC1
+            break   
+
+
+    return num_box, fbest, xbest, L
 
 def newpivcol(n1,n2,p,r,n,Y,X,CE0):
     """ Determine new pivot columns among the flag 2 columns
@@ -451,11 +466,14 @@ def getfeasiblept(p,k,box,A,b,c,xrelax,absxrelax):
     Ahat=A[np.ix_(supp,supp)]
     bhat=b[supp]
     bhat=np.reshape(bhat,(1,-1))
-    #print('bhat:',bhat)
+    print('Ahat:',Ahat)
+    print('bhat:',bhat)
+    print('c:',c)
     obj=minimize( quad_fun, start_pt[0], (Ahat,bhat[0],c) , method='CG', jac=grad_fun)
     xout=np.zeros((p,1))
     xout[supp]=np.reshape(obj.x,(-1,1))
     fout=obj.fun
+    print('xout,fout:',xout,fout)
 
     return xout,fout
     

@@ -36,6 +36,7 @@ def main(p,n,k,b0,mu,sigma,num_instances,num_alg,alg_flag):
 
         if alg_flag[0]==1:  # test ibbef
             tstart1=time.process_time()
+            x0=b
             xibbef, rss_each_inst[0,j]=ibbef.main(p,n,y,X,A,b,c,k,x0)
             tend1=time.process_time()
             print('start, end:',tstart1,tend1)
