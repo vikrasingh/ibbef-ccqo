@@ -8,6 +8,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     from scipy import linalg
     from scipy.optimize import minimize
     import heapq
+    import itertools
 
     epsilon=sys.float_info.epsilon    
     pivtol=max(p,n)*epsilon*np.linalg.norm( A, ord=np.inf)  #  tol to check non-zero pivot for echelon form
@@ -114,16 +115,16 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     E0=rowech()
     #print('E0:',E0)
     xlb=backsub(p,npiv0,E0,np.array(range(npiv0)))
-    #xlb[ipiv0]=xlb
+    print('xlb :',xlb)
     fxlb=fx(xlb,A,b,c)
     xhat0=xlb
     fxhat0=fxlb
-    #print('xlb :',xlb)
-    #print('fxlb:',fxlb)
+    print('fxlb:',fxlb)
     
     # Initialize the list L
     L = []
-    heapq.heappush( L, (fxlb, B0, 0, p, 0, xlb) )  # add the intial box to the list
+    box_age_ctr=0 # unique for every box we are adding, the oldest box will have the smallest counter
+    heapq.heappush( L, ( fxlb, box_age_ctr , B0 , 0, p, 0,  xlb) )  # add the intial box to the list
 
 
     while True:
@@ -134,11 +135,12 @@ def main(p,n,y,X,A,b,c,k,xrelax):
             break
         
         # select a new box to process
-        Y=heapq.heappop(L) # V[0]=fxlb, V[1]=box, V[2]=#0, V[3]=#1, V[4]=#2, V[5]=xlb
+        Y = heapq.heappop(L) # V[0]=fxlb, V[2]=box, V[3]=#0, V[4]=#1, V[5]=#2, V[6]=xlb
+        print('Selected node Y:',Y)
         num_box=num_box-1
 
         # branch over Y
-        num_box, fbest, xbest, L = branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrelax,npiv0,num_box)
+        box_age_ctr, num_box, fbest, xbest, L = branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrelax,npiv0,num_box,box_age_ctr)
             
     
     # final output
@@ -149,7 +151,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
 
     return xout, fout
                                 
-def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrelax,npiv0,num_box):
+def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrelax,npiv0,num_box,box_age_ctr):
     """
     
     """
@@ -159,47 +161,54 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
     from scipy.optimize import minimize
     import heapq
 
-    par_dir=np.arange(Y[1].size)[Y[1]==1][::-1]  # indices of partition direction in decreasing order
+
+    par_dir=np.arange(Y[2].size)[Y[2]==1][::-1]  # indices of partition direction in decreasing order
     print('par_dir:',par_dir)
     stop_par=0  # to stop the partition loop
     isDC2true=0     # flag to avoid checking DC2 for every flag 2 child box
-    uplimit=p-k-Y[2] 
+    uplimit=p-k-Y[3] 
     num_child=min(uplimit,float('inf'))
 
     for j in range(num_child):
 
         jhat=par_dir[j]  # partition index
-        print('Y:',Y[1])
-        tempV0=Y[1]
+        #print('Y:',Y)
+        tempV0=Y[2].copy()
         tempV0[jhat]=0    # child box with 0 flag
-        print('tempV0:',tempV0)
-        V0=(tempV0 , Y[2]+1, Y[3]-1, Y[4]) # initialization 
-        print('V0:',V0)
-        tempV2=Y[1]
+        #print('tempV0:',tempV0)
+        V0=[tempV0 , Y[3]+1, Y[4]-1, Y[5]] # initialization 
+        #print('V0:',V0)
+        tempV2=Y[2].copy()
         tempV2[jhat]=2   # child box with 2 flag
-        V2=(tempV2 , Y[2], Y[3]-1, Y[4]+1)
-        print('j,jhat,V2:',j,jhat,V2[0])
+        V2=[tempV2 , Y[3], Y[4]-1, Y[5]+1]
+        #print('j,jhat,V2:',j,jhat,V2[0])
 
         for ichild in range(2):
-
+            
             if ichild==0: # box with 0 flag
-
+                print('V0:',V0)
                 if j==(uplimit-1): # reached leaf node with k flag 1 in it
+                    print('Reached leaf node for V0 box')
                     # find the feasible point
                     if V0[2]<npiv0: # if #flag 1 < rank X
                         if V0[3]==0: # if there is no flag 2 in the box
+                            print('No flag 2 in V0')
                             xhat=backsub(p, V0[2], E0, range(V0[2]))
+                            print('Back sub xhat:',xhat)
 
                         else:
+                            print('Flag 2 in V0')
                             id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
                             xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
+                            print('Updated EF xhat:',xhat)
 
                         fxhat=fx(xhat, A, b, c)
-
+                
                     else:
                         xhat=xhat0
                         fxhat=fxhat0
 
+                    print('fxhat:',fxhat)
                     # update xbest ,fbest if possible
                     if fxhat<fbest:
                         xbest=xhat
@@ -209,40 +218,52 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
 
                 # sampling call
                 xtilde,fxtilde=getfeasiblept(p,k,V0[0],A,b,c,xrelax,absxrelax)
+                print('xtilde, fxtilde:',xtilde, fxtilde)
+
                 if fxtilde<fbest:
                     xbest=xtilde
                     fbest=fxtilde
 
                 # inclusion function call
+                print('F call for V0')
                 if V0[2] < npiv0: #  if #1 < npiv0
+                    print('#1 flag < npiv0')
                     if V0[3]==0: # no flag 0 in the box
                         xhat=backsub(p, V0[2], E0, range(V0[2]))
+                        print('Back sub xhat:',xhat)
+
                     else:
                         id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
                         xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
+                        print('Updated EF xhat:',xhat)
                             
                     fxhat=fx(xhat,A,b,c)
 
                 else: # if #flag 1 >= rank X
-                        xhat=xhat0
-                        fxhat=fxhat0
+                    xhat=xhat0
+                    fxhat=fxhat0
                         
-                xlb=xhat
-                fxlb=fxhat0
+                xlbV0=xhat
+                fxlbV0=fxhat
+                print('xlbV0,fxlbV0:',xlbV0,fxlbV0)
 
                 # check DC1
-                if fbest<=fxlb:
+                if fbest<=fxlbV0:
                     stop_par=1 # stop the j loop
+                    print('V0 got deleted using DC1')
                     continue # with the next ichild iteration
-
-                Y=(fxlb,) + V0 + (xlb,)
-                print('Y set again:',Y)
+                print('V0:',V0)
+                box_age_ctr +=1
+                Ytemp=(fxlbV0, box_age_ctr ,V0[0], V0[1] , V0[2] , V0[3] , xlbV0) 
+                #Y=(fxlb,) + V0 + (xlb,)
+                print('Ytemp:',Ytemp)
 
             else: # box with 2 flag
-
+                print('V2:',V2)
                 # check DC2
                 if j==0:
-                    if Y[4]+1==k:
+                    if Y[5]+1==k:
+                        print('DC2 is true for all V2 boxes')
                         isDC2true=1 # DC2 is satisfied for all the subsequent child boxes,check it only once
 
                 if isDC2true==1:
@@ -260,23 +281,28 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                 if fxtilde<fbest:
                     xbest=xtilde
                     fbest=fxtilde
-                            
-                xlb=Y[5]
-                fxlb=Y[0]
 
+                print('xtilde, fxtilde:',xtilde, fxtilde)            
+                xlb=Y[6]
+                fxlb=Y[0]
+                print('xlb,fxlb:',xlb,fxlb)
                 # check DC1
                 if fbest<=fxlb:
                     continue # discard the box
 
                 num_box = num_box+1
                 print('V2 added:',V2)
-                heapq.heappush( L, (fxlb,) + V2 + (xlb,) )  # add the V2 box to the list
+                box_age_ctr += 1
+                V2temp =(fxlb, box_age_ctr,  V2[0] , V2[1] , V2[2] , V2[3] , xlb)
+                heapq.heappush( L, V2temp )  # add the V2 box to the list
+                #heapq.heappush( L, (fxlb,) + V2 + (xlb,) )  # add the V2 box to the list
         
         if stop_par==1: # child box with flag 1 got deleted using DC1
             break   
 
+        Y = Ytemp  # assign the box with flag 0 to be the next parent box
 
-    return num_box, fbest, xbest, L
+    return box_age_ctr, num_box, fbest, xbest, L
 
 def newpivcol(n1,n2,p,r,n,Y,X,CE0):
     """ Determine new pivot columns among the flag 2 columns
@@ -419,17 +445,17 @@ def fx(x,A,b,c):
     #value=(Qx.T @ (D*Qx)) + b.T @ x + c
     value=0.5 * x.T @ A @ x  + b.T @ x + c 
 
-    return value
+    return value[0][0]
 
 def quad_fun(x,A,b,c):
     " x is 1D array"
     value= 0.5 * x @ A @ x.T + x @ b.T + c
-    return value
+    return value[0]
 
 def grad_fun(x,A,b,c):
     "g = Ax+b"
     value= x @ A + b
-    return value
+    return value[0]
 
 def quad_min(p,box,A,b,c,x0):
     " quadratic minimization using conjugate gradient method"
