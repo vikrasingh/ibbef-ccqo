@@ -355,7 +355,7 @@ def newpivcol(n1,n2,p,r,n,Y,X,CE0):
         if np.abs(ET[i,n1:n]).sum() > 1e-10: # if the row is not a zero row
             num_npr=num_npr+1
             jz=np.abs(ET[i,n1:n]).argmax()  # find the entry with largest magnitude to used as pivot entry
-            jz=jz+1
+            jz=jz+n1
             ET[i,n1:n]=ET[i,n1:n]/ET[i,jz] # make the pivot entry 1
             ETi=-ET[i,n1:n]
             for k in range(i+1,d):
