@@ -303,7 +303,9 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
         if stop_par==1: # child box with flag 1 got deleted using DC1
             break   
 
-        Y = Ytemp  # assign the box with flag 0 to be the next parent box
+        if j<(uplimit-1): # if the current V0 is not the leaf node 
+            Y = Ytemp  # assign the box with flag 0 to be the next parent box
+        
 
     return box_age_ctr, num_box, fbest, xbest, L
 
@@ -547,11 +549,14 @@ def getfeasiblept(p,k,box,A,b,c,xrelax,absxrelax):
 
         j += 1
 
+    absxrelax = np.reshape(absxrelax,(1,-1))[0] # make it a 1d array
+    print('absxrelax:',absxrelax)
     supp1=np.array(supp1,dtype=int)  
     print('supp1:',supp1)
     local_supp,_=getklargest(absxrelax[supp1],k)
-    #print('local_supp:',local_supp)
+    print('local_supp:',local_supp)
     supp=supp1[local_supp]
+    print('supp:',supp)
     start_pt=xrelax[supp]
     start_pt=np.reshape(start_pt,(1,-1))[0] # convert into a 1D array
     Ahat=A[np.ix_(supp,supp)]
