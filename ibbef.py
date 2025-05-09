@@ -43,7 +43,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     print('A:',A)
     print('b:',b)
     print('c:',c)
-    #print('X:',X)
+    print('X:',X)
     #print('xrelax:',xrelax)
 
     # get custom col echelon form of X
@@ -56,7 +56,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
            CE0: column echelon form of X
         """
         
-        CE0=X.T           # CE0 of size p x n
+        CE0=X.copy().T           # CE0 of size p x n
         num_piv=0         # initialization
         m=min([p,n])
         idx_piv=[True]*p  # to store indices of pivot column
@@ -162,7 +162,7 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
     from scipy import linalg
     from scipy.optimize import minimize
     import heapq
-
+    print('X input in branch:',X)
 
     par_dir=np.arange(Y[2].size)[Y[2]==1][::-1]  # indices of partition direction in decreasing order
     print('par_dir:',par_dir)
@@ -196,13 +196,13 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                         if V0[3]==0: # if there is no flag 2 in the box
                             print('No flag 2 in V0')
                             xhat=backsub(p, V0[2], E0, range(V0[2]))
-                            print('Back sub xhat:',xhat)
+                            #print('Back sub xhat:',xhat)
 
                         else:
                             print('Flag 2 in V0')
                             id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
                             xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
-                            print('Updated EF xhat:',xhat)
+                            #print('Updated EF xhat:',xhat)
 
                         fxhat=fx(xhat, A, b, c)
                 
@@ -211,6 +211,10 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                         fxhat=fxhat0
 
                     print('fxhat:',fxhat)
+                    ## confirm the solution
+                    ##xtemp,ftemp=quad_min(p,np.where(V0[0]!=0)[0],A,b,c,xrelax)  ## 
+                    ##print('Verification: xtemp,ftemp:',xtemp,ftemp) ##
+
                     # update xbest ,fbest if possible
                     if fxhat<fbest:
                         xbest=xhat
@@ -248,11 +252,14 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                 xlbV0=xhat
                 fxlbV0=fxhat
                 print('xlbV0,fxlbV0:',xlbV0,fxlbV0)
+                ## confirm the solution
+                ##xtemp,ftemp=quad_min(p,np.where(V0[0]!=0)[0],A,b,c,xrelax)  ## 
+                ##print('Verification: xtemp,ftemp:',xtemp,ftemp) ##
 
                 # check DC1
                 if fbest<=fxlbV0:
                     stop_par=1 # stop the j loop
-                    print('V0 got deleted using DC1')
+                    print('V0 got deleted using DC1: fbest, fxlbV0:',fbest,fxlbV0)
                     continue # with the next ichild iteration
                 print('V0:',V0)
                 box_age_ctr +=1
@@ -272,10 +279,13 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                     # call lb QM
                     suppV2=np.where(V2[0]==2)[0]
                     xhat,fxhat=quad_min(p,suppV2,A,b,c,xrelax)
+                    print('xhat,fhat:',xhat,fxhat)
                     # update xbest, fbest if possible
                     if fxhat<fbest:
                         xbest=xhat
                         fbest=fxhat
+                        print('xbest,fbest got updated')
+                        #print('xbest,fbest:',xbest,fbest)
                         
                     continue # with the next iter of j loop
 
@@ -284,13 +294,15 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                 if fxtilde<fbest:
                     xbest=xtilde
                     fbest=fxtilde
-
-                print('xtilde, fxtilde:',xtilde, fxtilde)            
+                    print('xbest,fbest got updated')
+                    #print('xbest,fbest:',xbest,fbest)
+            
                 xlb=Y[6]
                 fxlb=Y[0]
                 print('xlb,fxlb:',xlb,fxlb)
                 # check DC1
                 if fbest<=fxlb:
+                    print('V2 deleted DC1: fbest,fxlb',fbest,fxlb)
                     continue # discard the box
 
                 num_box = num_box+1
@@ -327,15 +339,15 @@ def newpivcol(n1,n2,p,r,n,Y,X,CE0):
     """
     import numpy as np
 
-    print('n1,n2,p,r,n,Y,X,CE0:',n1,n2,p,r,n,Y,X,CE0)
+    #print('n1,n2,p,r,n,Y,X,CE0:',n1,n2,p,r,n,Y,X,CE0)
     d=min(n1+n2,r)
     id=np.zeros(d,dtype=int) # initialization
     id[:n1]=np.array(range(n1)) # the first n1 entries of Y are flag 1
-    print('id:',id)
+    #print('id:',id)
     iflag2=np.where(Y==2) # indices of flag 2 entries in Y
-    print('iflag2:',iflag2)
+    #print('iflag2:',iflag2)
     id[n1:d]=iflag2[0][:d-n1]
-    print('id:',id)
+    #print('id:',id)
 
     CE=np.hstack( ( CE0[:,:n1],X[:,id[n1:d]] ) ) # initialize CE as col echelon form of X
     print('CE:',CE)
@@ -386,10 +398,10 @@ def efupdate(n1,n2,p,r,id,A0,E0):
         xstar : solution of the linear system after updating echelon form and back subs 
     """
     import numpy as np
-    print('n1,n2,p,r:',n1,n2,p,r)
-    print('id:',id)
-    print('A0:',A0)
-    print('E0:',E0)
+    #print('n1,n2,p,r:',n1,n2,p,r)
+    #print('id:',id)
+    #print('A0:',A0)
+    #print('E0:',E0)
     def updatelowerblock(A0):
         """ 
         Input:
@@ -420,17 +432,17 @@ def efupdate(n1,n2,p,r,id,A0,E0):
     
     cia = cia[bool_idx_cia]
     # drop the nonbasic cols correspond to flag 2 in the box and add RHS of the system [Q|d]
-    print('d:',d)
-    print('cia:',cia)
-    print('E0[:,cia]:',E0[:,cia])
-    print('E0[:,p]:',E0[:,p])
+    #print('d:',d)
+    #print('cia:',cia)
+    #print('E0[:,cia]:',E0[:,cia])
+    #print('E0[:,p]:',E0[:,p])
     tempE=np.hstack( ( E0[:,cia],E0[:,p].reshape((-1,1))) ) 
     # recycle the first n1 rows of E0 and add last r-n1 rows of A0
-    print('tempE[cia[:n1],:]:',tempE[cia[:n1],:])
-    print('cia[n1:d], np.concatenate((cia,[p])):',cia[n1:d],np.concatenate((cia,[p])))
+    #print('tempE[cia[:n1],:]:',tempE[cia[:n1],:])
+    #print('cia[n1:d], np.concatenate((cia,[p])):',cia[n1:d],np.concatenate((cia,[p])))
      
     if n1<d:
-        print('A0[cia[n1:d], np.concatenate((cia,[p])) ]:',A0[np.ix_(cia[n1:d], np.concatenate((cia,[p]))) ])
+        #print('A0[cia[n1:d], np.concatenate((cia,[p])) ]:',A0[np.ix_(cia[n1:d], np.concatenate((cia,[p]))) ])
         E=np.vstack( (tempE[cia[:n1],:],  A0[np.ix_( cia[n1:d], np.concatenate((cia,[p]))) ]  ) )
         E0=updatelowerblock(E)
     else:
@@ -440,7 +452,7 @@ def efupdate(n1,n2,p,r,id,A0,E0):
         E0[j,j:(d+1)]=E0[j,j:(d+1)]/E0[j,j]
         #print('E0:',E0)
         E0i=-E0[j,j:(d+1)]
-        for i in range(n1+1,d):
+        for i in range(j+1,d):
             E0[i,j:(d+1)]=E0i*E0[i,j] + E0[i,j:(d+1)]
             #print('E0:',E0)
             
@@ -504,12 +516,12 @@ def quad_min(p,supp,A,b,c,x0):
         
         return value
     
-    print('supp:',supp)
+    #print('supp:',supp)
     start_pt=np.reshape(x0[supp],(1,-1))[0]
     Ahat=A[np.ix_(supp,supp)]
     bhat=b[supp]
     bhat=np.reshape(bhat,(1,-1))[0] # convert into a 1D array
-    print('supp,Ahat,bhat,c,start_pt:',supp,Ahat,bhat,c,start_pt)
+    #print('supp,Ahat,bhat,c,start_pt:',supp,Ahat,bhat,c,start_pt)
     obj=minimize( quad_fun, start_pt, (Ahat,bhat,c), method='CG', jac=grad_fun)
     xout=np.zeros((p,1))
     xout[supp]=np.reshape(obj.x,(-1,1))
@@ -550,27 +562,27 @@ def getfeasiblept(p,k,box,A,b,c,xrelax,absxrelax):
         j += 1
 
     absxrelax = np.reshape(absxrelax,(1,-1))[0] # make it a 1d array
-    print('absxrelax:',absxrelax)
+    #print('absxrelax:',absxrelax)
     supp1=np.array(supp1,dtype=int)  
-    print('supp1:',supp1)
+    #print('supp1:',supp1)
     local_supp,_=getklargest(absxrelax[supp1],k)
-    print('local_supp:',local_supp)
+    #print('local_supp:',local_supp)
     supp=supp1[local_supp]
-    print('supp:',supp)
+    #print('supp:',supp)
     start_pt=xrelax[supp]
     start_pt=np.reshape(start_pt,(1,-1))[0] # convert into a 1D array
     Ahat=A[np.ix_(supp,supp)]
     bhat=b[supp]
     bhat=np.reshape(bhat,(1,-1))[0]
-    print('supp:',supp)
-    print('Ahat:',Ahat)
-    print('bhat:',bhat)
-    print('c:',c)
+    #print('supp:',supp)
+    #print('Ahat:',Ahat)
+    #print('bhat:',bhat)
+    #print('c:',c)
     obj=minimize( quad_fun, start_pt, (Ahat,bhat,c) , method='CG', jac=grad_fun)
     xout=np.zeros((p,1))
     xout[supp]=np.reshape(obj.x,(-1,1))
     fout=obj.fun
-    print('xout,fout:',xout,fout)
+    #print('xout,fout:',xout,fout)
 
     return xout,fout
     
