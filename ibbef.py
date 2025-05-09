@@ -40,7 +40,9 @@ def main(p,n,y,X,A,b,c,k,xrelax):
        xrelax=np.concatenate( (xrelax[ipiv0],xrelax[ipiv1]) )
 
     absxrelax=np.abs(xrelax) # absolute value of xrelax array
-    #print('A:',A)
+    print('A:',A)
+    print('b:',b)
+    print('c:',c)
     #print('X:',X)
     #print('xrelax:',xrelax)
 
@@ -268,7 +270,8 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
 
                 if isDC2true==1:
                     # call lb QM
-                    xhat,fxhat=quad_min(p,V2[0],A,b,c,xrelax)
+                    suppV2=np.where(V2[0]==2)[0]
+                    xhat,fxhat=quad_min(p,suppV2,A,b,c,xrelax)
                     # update xbest, fbest if possible
                     if fxhat<fbest:
                         xbest=xhat
@@ -322,13 +325,18 @@ def newpivcol(n1,n2,p,r,n,Y,X,CE0):
     """
     import numpy as np
 
+    print('n1,n2,p,r,n,Y,X,CE0:',n1,n2,p,r,n,Y,X,CE0)
     d=min(n1+n2,r)
-    id=np.zeros(d) # initialization
+    id=np.zeros(d,dtype=int) # initialization
     id[:n1]=np.array(range(n1)) # the first n1 entries of Y are flag 1
+    print('id:',id)
     iflag2=np.where(Y==2) # indices of flag 2 entries in Y
-    id[n1:d]=iflag2[:d-n1]
+    print('iflag2:',iflag2)
+    id[n1:d]=iflag2[0][:d-n1]
+    print('id:',id)
 
     CE=np.hstack( ( CE0[:,:n1],X[:,id[n1:d]] ) ) # initialize CE as col echelon form of X
+    print('CE:',CE)
     T=CE.T   # use EROs on the transpose, T=[U, *; V, W]
     # reduce the lower left block of T corresponding to the first n1 cols
     # to zero to get ET=[U, *; 0, Z] after EROs
@@ -339,17 +347,17 @@ def newpivcol(n1,n2,p,r,n,Y,X,CE0):
             ET[i,j:n]=ETi*ET[i,j] + ET[i,j:n]
         
     # now, ET=[U, *; 0, Z]
-
+    print('ET:',ET)
     num_npr=0  # no. of new pivot cols
-    for i in range(n1,n1+n2): # first n1 rows of T are not changed
-        if np.abs(ET[i,n1:d]).sum() > 1e-10: # if the row is not a zero row
+    for i in range(n1,d): # first n1 rows of T are not changed
+        if np.abs(ET[i,n1:n]).sum() > 1e-10: # if the row is not a zero row
             num_npr=num_npr+1
-            jz=np.abs(ET[i,n1:d]).argmax()  # find the entry with largest magnitude to used as pivot entry
+            jz=np.abs(ET[i,n1:n]).argmax()  # find the entry with largest magnitude to used as pivot entry
             jz=jz+1
-            ET[i,n1:d]=ET[i,n1:d]/ET[i,jz] # make the pivot entry 1
-            ETi=-ET[i,n1:d]
+            ET[i,n1:n]=ET[i,n1:n]/ET[i,jz] # make the pivot entry 1
+            ETi=-ET[i,n1:n]
             for k in range(i+1,d):
-                ET[k,n1:d]=ETi*ET[k,jz] + ET[k,n1:d] # EROs
+                ET[k,n1:n]=ETi*ET[k,jz] + ET[k,n1:n] # EROs
 
             id[i]=-id[i]
             if num_npr==(r-n1):
@@ -376,7 +384,10 @@ def efupdate(n1,n2,p,r,id,A0,E0):
         xstar : solution of the linear system after updating echelon form and back subs 
     """
     import numpy as np
-
+    print('n1,n2,p,r:',n1,n2,p,r)
+    print('id:',id)
+    print('A0:',A0)
+    print('E0:',E0)
     def updatelowerblock(A0):
         """ 
         Input:
@@ -395,17 +406,43 @@ def efupdate(n1,n2,p,r,id,A0,E0):
         return E0
 
     d=min(n1+n2,r)
-    cia=np.zeros(d) # initialization
+    cia=np.zeros(d,dtype=int) # initialization
     cia[:n1]=np.array(range(n1)) # first n1 indices are flag 1
+    bool_idx_cia=np.ones(d,dtype=bool) # to discard indices of dependent cols
     for j in range(n1,d):
-        if j<=(r-1) and id[j]<0:
+        if id[j]<0:
             cia[j]=-id[j]
-        
+        else:
+            d=d-1
+            bool_idx_cia[j]=False
+    
+    cia = cia[bool_idx_cia]
     # drop the nonbasic cols correspond to flag 2 in the box and add RHS of the system [Q|d]
-    tempE=np.hstack( ( E0[:,cia],E0[:,p]) ) 
+    print('d:',d)
+    print('cia:',cia)
+    print('E0[:,cia]:',E0[:,cia])
+    print('E0[:,p]:',E0[:,p])
+    tempE=np.hstack( ( E0[:,cia],E0[:,p].reshape((-1,1))) ) 
     # recycle the first n1 rows of E0 and add last r-n1 rows of A0
-    E=np.vstack( (tempE[cia[:n1],:],   A0[cia[n1:d], np.hstack((cia,p)) ] ) )
-    E0=updatelowerblock(E)
+    print('tempE[cia[:n1],:]:',tempE[cia[:n1],:])
+    print('cia[n1:d], np.concatenate((cia,[p])):',cia[n1:d],np.concatenate((cia,[p])))
+     
+    if n1<d:
+        print('A0[cia[n1:d], np.concatenate((cia,[p])) ]:',A0[np.ix_(cia[n1:d], np.concatenate((cia,[p]))) ])
+        E=np.vstack( (tempE[cia[:n1],:],  A0[np.ix_( cia[n1:d], np.concatenate((cia,[p]))) ]  ) )
+        E0=updatelowerblock(E)
+    else:
+        E0=tempE[cia[:n1],:]
+
+    for j in range(n1,d):
+        E0[j,j:(d+1)]=E0[j,j:(d+1)]/E0[j,j]
+        #print('E0:',E0)
+        E0i=-E0[j,j:(d+1)]
+        for i in range(n1+1,d):
+            E0[i,j:(d+1)]=E0i*E0[i,j] + E0[i,j:(d+1)]
+            #print('E0:',E0)
+            
+    #print('E0:',E0)
     xr=backsub(d,d,E0,range(d)) # back sub
     xstar=np.zeros((p,1)) # initialization
     xstar[cia]=xr
@@ -447,29 +484,31 @@ def fx(x,A,b,c):
 
     return value[0][0]
 
-def quad_fun(x,A,b,c):
-    " x is 1D array"
-    value= 0.5 * x @ A @ x.T + x @ b.T + c
-    return value[0]
-
-def grad_fun(x,A,b,c):
-    "g = Ax+b"
-    value= x @ A + b
-    return value[0]
-
-def quad_min(p,box,A,b,c,x0):
+def quad_min(p,supp,A,b,c,x0):
     " quadratic minimization using conjugate gradient method"
 
     import numpy as np
     from scipy.optimize import minimize
+
+    def quad_fun(x,A,b,c):
+        " x is 1D array"
+        value= 0.5 * x @ A @ x.T + x @ b.T + c
+        
+        return value
+
+    def grad_fun(x,A,b,c):
+        "g = Ax+b"
+        value= x @ A + b
+        
+        return value
     
-    supp=np.where(box!=0)[0] # find the indices of flag 1 and flag 2
-    start_pt=x0[supp]
+    print('supp:',supp)
+    start_pt=np.reshape(x0[supp],(1,-1))[0]
     Ahat=A[np.ix_(supp,supp)]
     bhat=b[supp]
-    bhat=np.reshape(bhat,(1,-1)) # convert into a 1D array
-
-    obj=minimize( quad_fun, start_pt, method='CG', jac=grad_fun)
+    bhat=np.reshape(bhat,(1,-1))[0] # convert into a 1D array
+    print('supp,Ahat,bhat,c,start_pt:',supp,Ahat,bhat,c,start_pt)
+    obj=minimize( quad_fun, start_pt, (Ahat,bhat,c), method='CG', jac=grad_fun)
     xout=np.zeros((p,1))
     xout[supp]=np.reshape(obj.x,(-1,1))
     fout=obj.fun
@@ -482,20 +521,47 @@ def getfeasiblept(p,k,box,A,b,c,xrelax,absxrelax):
     import numpy as np
     from scipy.optimize import minimize
 
-    supp1=np.where(box!=0)[0] # find the indices of flag 1 and flag 2
-    #print('supp1:',supp1)
+    def quad_fun(x,A,b,c):
+        " x is 1D array"
+        value= 0.5 * x @ A @ x.T + x @ b.T + c
+        return value
+
+    def grad_fun(x,A,b,c):
+        "g = Ax+b"
+        value= x @ A + b
+        return value
+
+    #supp1=np.where(box!=0)[0] # find the indices of flag 1 and flag 2
+    supp1=[]
+    ctr=0
+    for i in range(p):
+        if box[i]==2:
+            supp1 = np.concatenate((supp1,[i]))
+            ctr += 1
+
+    j = 0
+    while ctr < k:
+        if box[j]==1:
+            supp1 = np.concatenate((supp1,[j]))
+            ctr += 1
+
+        j += 1
+
+    supp1=np.array(supp1,dtype=int)  
+    print('supp1:',supp1)
     local_supp,_=getklargest(absxrelax[supp1],k)
     #print('local_supp:',local_supp)
     supp=supp1[local_supp]
     start_pt=xrelax[supp]
-    start_pt=np.reshape(start_pt,(1,-1)) # convert into a 1D array
+    start_pt=np.reshape(start_pt,(1,-1))[0] # convert into a 1D array
     Ahat=A[np.ix_(supp,supp)]
     bhat=b[supp]
-    bhat=np.reshape(bhat,(1,-1))
+    bhat=np.reshape(bhat,(1,-1))[0]
+    print('supp:',supp)
     print('Ahat:',Ahat)
     print('bhat:',bhat)
     print('c:',c)
-    obj=minimize( quad_fun, start_pt[0], (Ahat,bhat[0],c) , method='CG', jac=grad_fun)
+    obj=minimize( quad_fun, start_pt, (Ahat,bhat,c) , method='CG', jac=grad_fun)
     xout=np.zeros((p,1))
     xout[supp]=np.reshape(obj.x,(-1,1))
     fout=obj.fun
