@@ -51,7 +51,7 @@ def main(p,n,k,b0,mu,sigma,num_instances,num_alg,alg_flag):
             tstart2=time.process_time()
             xmio, rss_each_inst[1,j] = mio.main(p,n,y,X,A,b,c,k,low,up,x0)
             tend2=time.process_time()
-            cputime2=tend2-tstart2
+            cpu_time_each_inst[1,j]=tend2-tstart2
             print('xmio:',xmio)
             print('fmio:',rss_each_inst[1,j])
             print('cpu mio:',cpu_time_each_inst[1,j])
