@@ -1,4 +1,4 @@
-def main(p,n,y,X,k):
+def main(p,n,y,X,k,max_iter=1000,num_runs=50):
 
     import numpy as np
     from scipy import linalg
@@ -8,8 +8,8 @@ def main(p,n,y,X,k):
     real_eigenvalues=eigenvalues.real  # get the real part of the eigen values as the img part is 0
     #print('real_eig:',real_eigenvalues)
     L = np.max(real_eigenvalues) # the largest eigenvalue of X'X
-    max_iter=1000  # iter. limit
-    num_runs=50    # no. of runs from random starting points    
+    #max_iter=1000  # iter. limit
+    #num_runs=50    # no. of runs from random starting points    
     epstol=1e-4   # this tolerance is suggested in the reference p833 
     stop_flag=0   # =0 means full convergence, =5 means, maxiter has been reached for atleast 1 of the random runs
 

@@ -284,12 +284,15 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                     continue # with the next iter of j loop
 
                 # call feasiblity sampling
+                """ 
                 xtilde,fxtilde=getfeasiblept(p,n,y,X,A,b,c,k,V2[0],xrelax,absxrelax)
                 if fxtilde<fbest:
                     xbest=xtilde
                     fbest=fxtilde
                     #print('xbest,fbest got updated')
                     #print('xbest,fbest:',xbest,fbest)
+                """
+                
             
                 xlb=Y[6]
                 fxlb=Y[0]
@@ -552,7 +555,7 @@ def getfeasiblept(p,n,y,X,A,b,c,k,box,xrelax,absxrelax):
     #print('box,k:',box,k)
     #print('supp1:',supp1)
 
-    xpg,fxpg=pg.main(ctr,n,y,X[:,supp1],k) # xpg is in the reduced dim.
+    xpg,fxpg=pg.main(ctr,n,y,X[:,supp1],k,num_runs=5) # xpg is in the reduced dim.
     #print('xpg:',xpg)
     xout=np.zeros((p,1))
     xout[supp1]=xpg
