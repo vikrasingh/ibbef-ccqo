@@ -8,7 +8,6 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     from scipy import linalg
     from scipy.optimize import minimize
     import heapq
-    import itertools
 
     epsilon=sys.float_info.epsilon    
     pivtol=max(p,n)*epsilon*np.linalg.norm( A, ord=np.inf)  #  tol to check non-zero pivot for echelon form
@@ -40,10 +39,10 @@ def main(p,n,y,X,A,b,c,k,xrelax):
        xrelax=np.concatenate( (xrelax[ipiv0],xrelax[ipiv1]) )
 
     absxrelax=np.abs(xrelax) # absolute value of xrelax array
-    print('A:',A)
-    print('b:',b)
-    print('c:',c)
-    print('X:',X)
+    #print('A:',A)
+    #print('b:',b)
+    #print('c:',c)
+    #print('X:',X)
     #print('xrelax:',xrelax)
 
     # get custom col echelon form of X
@@ -91,11 +90,11 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     B0=np.ones(p,dtype=int) # initial box of integer ones
     niter=0
     num_box=1
-    xbest,fbest=getfeasiblept(p,k,B0,A,b,c,xrelax,absxrelax)
+    xbest,fbest=getfeasiblept(p,n,y,X,A,b,c,k,B0,xrelax,absxrelax)
     #xbest=np.zeros((p,1)) # intialize xbest
     #supp0,xbest[supp0]=getklargest(absxrelax,k)
     #fbest=fx(xbest[supp0],A[np.ix_(supp0,supp0)],b[supp0],c)
-    print('xbest,fbest:',xbest,fbest)
+    #print('xbest,fbest:',xbest,fbest)
 
 
     def rowech():
@@ -117,11 +116,11 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     E0=rowech()
     #print('E0:',E0)
     xlb=backsub(p,npiv0,E0,np.array(range(npiv0)))
-    print('xlb :',xlb)
+    #print('xlb :',xlb)
     fxlb=fx(xlb,A,b,c)
     xhat0=xlb
     fxhat0=fxlb
-    print('fxlb:',fxlb)
+    #print('fxlb:',fxlb)
     
     # Initialize the list L
     L = []
@@ -131,6 +130,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
 
     while True:
 
+        niter += 1
         # check for convergence criteria
         if num_box==0:
             print('alg. converged')
@@ -138,7 +138,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
         
         # select a new box to process
         Y = heapq.heappop(L) # V[0]=fxlb, V[2]=box, V[3]=#0, V[4]=#1, V[5]=#2, V[6]=xlb
-        print('Selected node Y:',Y)
+        #print('Selected node Y:',Y)
         num_box=num_box-1
 
         # branch over Y
@@ -162,10 +162,10 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
     from scipy import linalg
     from scipy.optimize import minimize
     import heapq
-    print('X input in branch:',X)
+    #print('X input in branch:',X)
 
     par_dir=np.arange(Y[2].size)[Y[2]==1][::-1]  # indices of partition direction in decreasing order
-    print('par_dir:',par_dir)
+    #print('par_dir:',par_dir)
     stop_par=0  # to stop the partition loop
     isDC2true=0     # flag to avoid checking DC2 for every flag 2 child box
     uplimit=p-k-Y[3] 
@@ -188,18 +188,18 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
         for ichild in range(2):
             
             if ichild==0: # box with 0 flag
-                print('V0:',V0)
+                #print('V0:',V0)
                 if j==(uplimit-1): # reached leaf node with k flag 1 in it
-                    print('Reached leaf node for V0 box')
+                    #print('Reached leaf node for V0 box')
                     # find the feasible point
                     if V0[2]<npiv0: # if #flag 1 < rank X
                         if V0[3]==0: # if there is no flag 2 in the box
-                            print('No flag 2 in V0')
+                            #print('No flag 2 in V0')
                             xhat=backsub(p, V0[2], E0, range(V0[2]))
                             #print('Back sub xhat:',xhat)
 
                         else:
-                            print('Flag 2 in V0')
+                            #print('Flag 2 in V0')
                             id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
                             xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
                             #print('Updated EF xhat:',xhat)
@@ -210,7 +210,7 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                         xhat=xhat0
                         fxhat=fxhat0
 
-                    print('fxhat:',fxhat)
+                    #print('fxhat:',fxhat)
                     ## confirm the solution
                     ##xtemp,ftemp=quad_min(p,np.where(V0[0]!=0)[0],A,b,c,xrelax)  ## 
                     ##print('Verification: xtemp,ftemp:',xtemp,ftemp) ##
@@ -223,26 +223,20 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                     continue # with the next ichild iteration
 
                 # sampling call
-                xtilde,fxtilde=getfeasiblept(p,k,V0[0],A,b,c,xrelax,absxrelax)
-                print('xtilde, fxtilde:',xtilde, fxtilde)
+                xtilde,fxtilde=getfeasiblept(p,n,y,X,A,b,c,k,V0[0],xrelax,absxrelax)
+                #print('xtilde, fxtilde:',xtilde, fxtilde)
 
-                if fxtilde<fbest:
+                if fxtilde<fbest: # update best solution if possible
                     xbest=xtilde
                     fbest=fxtilde
 
                 # inclusion function call
-                print('F call for V0')
+                #print('F call for V0')
                 if V0[2] < npiv0: #  if #1 < npiv0
-                    print('#1 flag < npiv0')
-                    if V0[3]==0: # no flag 0 in the box
-                        xhat=backsub(p, V0[2], E0, range(V0[2]))
-                        print('Back sub xhat:',xhat)
-
-                    else:
-                        id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
-                        xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
-                        print('Updated EF xhat:',xhat)
-                            
+                    #print('#1 flag < npiv0')
+                    id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
+                    xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
+                    #print('Updated EF xhat:',xhat)         
                     fxhat=fx(xhat,A,b,c)
 
                 else: # if #flag 1 >= rank X
@@ -251,7 +245,7 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                         
                 xlbV0=xhat
                 fxlbV0=fxhat
-                print('xlbV0,fxlbV0:',xlbV0,fxlbV0)
+                #print('xlbV0,fxlbV0:',xlbV0,fxlbV0)
                 ## confirm the solution
                 ##xtemp,ftemp=quad_min(p,np.where(V0[0]!=0)[0],A,b,c,xrelax)  ## 
                 ##print('Verification: xtemp,ftemp:',xtemp,ftemp) ##
@@ -259,54 +253,54 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                 # check DC1
                 if fbest<=fxlbV0:
                     stop_par=1 # stop the j loop
-                    print('V0 got deleted using DC1: fbest, fxlbV0:',fbest,fxlbV0)
+                    #print('V0 got deleted using DC1: fbest, fxlbV0:',fbest,fxlbV0)
                     continue # with the next ichild iteration
-                print('V0:',V0)
+                #print('V0:',V0)
                 box_age_ctr +=1
                 Ytemp=(fxlbV0, box_age_ctr ,V0[0], V0[1] , V0[2] , V0[3] , xlbV0) 
                 #Y=(fxlb,) + V0 + (xlb,)
-                print('Ytemp:',Ytemp)
+                #print('Ytemp:',Ytemp)
 
             else: # box with 2 flag
-                print('V2:',V2)
+                #print('V2:',V2)
                 # check DC2
                 if j==0:
                     if Y[5]+1==k:
-                        print('DC2 is true for all V2 boxes')
+                        #print('DC2 is true for all V2 boxes')
                         isDC2true=1 # DC2 is satisfied for all the subsequent child boxes,check it only once
 
                 if isDC2true==1:
                     # call lb QM
                     suppV2=np.where(V2[0]==2)[0]
                     xhat,fxhat=quad_min(p,suppV2,A,b,c,xrelax)
-                    print('xhat,fhat:',xhat,fxhat)
+                    #print('xhat,fhat:',xhat,fxhat)
                     # update xbest, fbest if possible
                     if fxhat<fbest:
                         xbest=xhat
                         fbest=fxhat
-                        print('xbest,fbest got updated')
+                        #print('xbest,fbest got updated')
                         #print('xbest,fbest:',xbest,fbest)
                         
                     continue # with the next iter of j loop
 
                 # call feasiblity sampling
-                xtilde,fxtilde=getfeasiblept(p,k,V2[0],A,b,c,xrelax,absxrelax)
+                xtilde,fxtilde=getfeasiblept(p,n,y,X,A,b,c,k,V2[0],xrelax,absxrelax)
                 if fxtilde<fbest:
                     xbest=xtilde
                     fbest=fxtilde
-                    print('xbest,fbest got updated')
+                    #print('xbest,fbest got updated')
                     #print('xbest,fbest:',xbest,fbest)
             
                 xlb=Y[6]
                 fxlb=Y[0]
-                print('xlb,fxlb:',xlb,fxlb)
+                #print('xlb,fxlb:',xlb,fxlb)
                 # check DC1
                 if fbest<=fxlb:
-                    print('V2 deleted DC1: fbest,fxlb',fbest,fxlb)
+                    #print('V2 deleted DC1: fbest,fxlb',fbest,fxlb)
                     continue # discard the box
 
                 num_box = num_box+1
-                print('V2 added:',V2)
+                #print('V2 added:',V2)
                 box_age_ctr += 1
                 V2temp =(fxlb, box_age_ctr,  V2[0] , V2[1] , V2[2] , V2[3] , xlb)
                 heapq.heappush( L, V2temp )  # add the V2 box to the list
@@ -340,7 +334,7 @@ def newpivcol(n1,n2,p,r,n,Y,X,CE0):
     import numpy as np
 
     #print('n1,n2,p,r,n,Y,X,CE0:',n1,n2,p,r,n,Y,X,CE0)
-    d=min(n1+n2,r)
+    d=n1+n2
     id=np.zeros(d,dtype=int) # initialization
     id[:n1]=np.array(range(n1)) # the first n1 entries of Y are flag 1
     #print('id:',id)
@@ -350,7 +344,7 @@ def newpivcol(n1,n2,p,r,n,Y,X,CE0):
     #print('id:',id)
 
     CE=np.hstack( ( CE0[:,:n1],X[:,id[n1:d]] ) ) # initialize CE as col echelon form of X
-    print('CE:',CE)
+    #print('CE:',CE)
     T=CE.T   # use EROs on the transpose, T=[U, *; V, W]
     # reduce the lower left block of T corresponding to the first n1 cols
     # to zero to get ET=[U, *; 0, Z] after EROs
@@ -361,7 +355,7 @@ def newpivcol(n1,n2,p,r,n,Y,X,CE0):
             ET[i,j:n]=ETi*ET[i,j] + ET[i,j:n]
         
     # now, ET=[U, *; 0, Z]
-    print('ET:',ET)
+    #print('ET:',ET)
     num_npr=0  # no. of new pivot cols
     for i in range(n1,d): # first n1 rows of T are not changed
         if np.abs(ET[i,n1:n]).sum() > 1e-10: # if the row is not a zero row
@@ -419,7 +413,7 @@ def efupdate(n1,n2,p,r,id,A0,E0):
 
         return E0
 
-    d=min(n1+n2,r)
+    d=n1+n2
     cia=np.zeros(d,dtype=int) # initialization
     cia[:n1]=np.array(range(n1)) # first n1 indices are flag 1
     bool_idx_cia=np.ones(d,dtype=bool) # to discard indices of dependent cols
@@ -529,11 +523,12 @@ def quad_min(p,supp,A,b,c,x0):
 
     return xout, fout
 
-def getfeasiblept(p,k,box,A,b,c,xrelax,absxrelax):
+def getfeasiblept(p,n,y,X,A,b,c,k,box,xrelax,absxrelax):
     "Find a feasible point"
     
     import numpy as np
     from scipy.optimize import minimize
+    import projgrad as pg
 
     def quad_fun(x,A,b,c):
         " x is 1D array"
@@ -549,6 +544,26 @@ def getfeasiblept(p,k,box,A,b,c,xrelax,absxrelax):
     supp1=[]
     ctr=0
     for i in range(p):
+        if box[i]!=0:
+            supp1 = np.concatenate((supp1,[i]))
+            ctr += 1
+
+    supp1=np.array(supp1,dtype=int)  
+    #print('box,k:',box,k)
+    #print('supp1:',supp1)
+
+    xpg,fxpg=pg.main(ctr,n,y,X[:,supp1],k) # xpg is in the reduced dim.
+    #print('xpg:',xpg)
+    xout=np.zeros((p,1))
+    xout[supp1]=xpg
+    fout=fxpg
+
+    return xout, fout
+    """
+    #supp1=np.where(box!=0)[0] # find the indices of flag 1 and flag 2
+    supp1=[]
+    ctr=0
+    for i in range(p):
         if box[i]==2:
             supp1 = np.concatenate((supp1,[i]))
             ctr += 1
@@ -560,11 +575,11 @@ def getfeasiblept(p,k,box,A,b,c,xrelax,absxrelax):
             ctr += 1
 
         j += 1
-
-    absxrelax = np.reshape(absxrelax,(1,-1))[0] # make it a 1d array
-    #print('absxrelax:',absxrelax)
+ 
     supp1=np.array(supp1,dtype=int)  
     #print('supp1:',supp1)
+    absxrelax = np.reshape(absxrelax,(1,-1))[0] # make it a 1d array
+    #print('absxrelax:',absxrelax)
     local_supp,_=getklargest(absxrelax[supp1],k)
     #print('local_supp:',local_supp)
     supp=supp1[local_supp]
@@ -579,12 +594,14 @@ def getfeasiblept(p,k,box,A,b,c,xrelax,absxrelax):
     #print('bhat:',bhat)
     #print('c:',c)
     obj=minimize( quad_fun, start_pt, (Ahat,bhat,c) , method='CG', jac=grad_fun)
+    
     xout=np.zeros((p,1))
     xout[supp]=np.reshape(obj.x,(-1,1))
     fout=obj.fun
     #print('xout,fout:',xout,fout)
 
     return xout,fout
+    """
     
 def getklargest(given_list,select_k):
         """ Extract a sub array of size kx1 with k largest entries

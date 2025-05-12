@@ -28,7 +28,7 @@ def main(p,n,k,b0,mu,sigma,num_instances,num_alg,alg_flag):
         c = y.T @ y                # constant
         c = c[0][0]                # make c scalar
         # for debugging purpose
-        print('X,A,b,c:',X,A,b,c)
+        #print('X,A,b,c:',X,A,b,c)
 
         # find an initial feasible point
         x0,fx0=projgrad.main(p,n,y,X,k)

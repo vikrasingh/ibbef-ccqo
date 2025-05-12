@@ -5,7 +5,9 @@ def main(p,n,y,X,k):
 
     XX = X.T @ X  
     eigenvalues,_=np.linalg.eig(XX)
-    L = np.max(eigenvalues) # the largest eigenvalue of X'X
+    real_eigenvalues=eigenvalues.real  # get the real part of the eigen values as the img part is 0
+    #print('real_eig:',real_eigenvalues)
+    L = np.max(real_eigenvalues) # the largest eigenvalue of X'X
     max_iter=1000  # iter. limit
     num_runs=50    # no. of runs from random starting points    
     epstol=1e-4   # this tolerance is suggested in the reference p833 
@@ -15,20 +17,26 @@ def main(p,n,y,X,k):
         fitted_model = linalg.lstsq(X, y) # least square fit
         beta0=fitted_model[0]
     else:
-        col_sum = np.sum(X ** 2, axis=0)
-        beta0 = (X.T @ y)/col_sum
-
+        col_sum = np.sum(X ** 2, axis=0).reshape((-1,1))
+        Xy = X.T @ y
+        Xy = np.reshape(Xy, (1,-1)) # make it a row vector
+        #print('col_sum:',col_sum)
+        #print('X*y:',X.T @ y)
+        beta0 = X.T @ y/col_sum
+        
     beta=beta0
+    #print('beta0:',beta0)
     fun_val=np.inf # initialization
     beta_out=beta0 
     #print('beta0:',beta)
-    print('p,k=',p,k)
+    #print('p,k=',p,k)
     for i in range(num_runs):
 
         for j in range(max_iter):
             beta_old = beta
             # gradient descent step
             grad = - X.T @ (y - X @ beta) 
+            #print('grad, L:',grad,L)
             beta = beta - grad/L
             #print('beta=',beta)
             # pick the top k entries and set rest to zero
