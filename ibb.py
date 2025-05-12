@@ -1,4 +1,4 @@
-def main(p,n,y,X,A,b,c,k,xrelax):
+def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1):
     """IBB+ with lb using recycled echelon form
 
        xrelax: xRelaxedOpt
@@ -10,83 +10,14 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     import heapq
 
     epsilon=sys.float_info.epsilon    
-    pivtol=max(p,n)*epsilon*np.linalg.norm( A, ord=np.inf)  #  tol to check non-zero pivot for echelon form
-    R, ipiv0 = linalg.qr(A, mode='r', pivoting=True)
-    diagR=np.abs(np.diag(R))
-    
-    npiv0=sum( i >= pivtol for i in diagR)
-    ipiv0=ipiv0[0:npiv0]
-    ipiv1=[i for i in range(p) if i not in ipiv0]
     
     absxrelax=np.abs(xrelax) # absolute value of xrelax array
-    print('A:',A)
-    print('ipiv0:',ipiv0)
-    print('ipiv1:',ipiv1)
-    #print('A[ipiv0,ipiv0]',A[np.ix_(ipiv0,ipiv0)])
-    #print('A[ipiv0,ipiv1]',A[np.ix_(ipiv0,ipiv1)])
-    #print('A[ipiv1,ipiv0]',A[np.ix_(ipiv1,ipiv0)])
-    #print('A[ipiv1,ipiv1]',A[np.ix_(ipiv1,ipiv1)])
-
-    # Switch the cols and rows of the quadratic function
-    if not ipiv1: # ipiv1=[]
-       A=A[np.ix_(ipiv0,ipiv0)]
-       b=b[ipiv0]
-       X=X[:,ipiv0]
-       xrelax=xrelax[ipiv0]
-    else: 
-       A=np.vstack( (  np.hstack((A[np.ix_(ipiv0,ipiv0)],A[np.ix_(ipiv0,ipiv1)])),np.hstack( (A[np.ix_(ipiv1,ipiv0)],A[np.ix_(ipiv1,ipiv1)]) )) )
-       b=np.concatenate( (b[ipiv0],b[ipiv1]) )
-       X=np.hstack( (X[:,ipiv0],X[:,ipiv1]) )
-       xrelax=np.concatenate( (xrelax[ipiv0],xrelax[ipiv1]) )
-
     print('A:',A)
     print('b:',b)
     #print('X:',X)
     #print('xrelax:',xrelax)
 
-    # get custom col echelon form of X
-    def colech():
-        """ Initial column echelon for design matrix X
-
-           Output:
-           num_piv: no. of pivot columns found during EROs
-           idx_piv: indices of those pivot columns
-           CE0: column echelon form of X
-        """
-        
-        CE0=X.T           # CE0 of size p x n
-        num_piv=0         # initialization
-        m=min([p,n])
-        idx_piv=[True]*p  # to store indices of pivot column
-        
-        for i in range(m):
-            if np.abs(CE0[i,i])<pivtol:
-                idx_piv[i]=False # i is the non pivot column
-                continue
-            num_piv=num_piv+1
-            CE0[i,i:n]=CE0[i,i:n]/CE0[i,i] # make the pivot entry 1
-            CE0i=-CE0[i,i:n]  
-            for k in range(i+1,m):
-                CE0[k,i:n]=CE0i*CE0[k,i] + CE0[k,i:n]  # EROs
-        
-        if num_piv<p:
-            #print('num_piv:',num_piv)
-            #print('p-num_piv:',p-num_piv)
-            #print('subarray:',idx_piv[num_piv:])
-            idx_piv[num_piv:]=[False]*(p-num_piv)
-
-        CE0=CE0[idx_piv,:].T    # final CE0 of size n x num_piv
-        return num_piv, idx_piv, CE0 
-
-    npiv00,_,CE0=colech()
-    if npiv00!=npiv0:
-        print('No. of pivot cols of X from custom echelon form is not same as qr')
-
-    print('npiv0, npiv00:',npiv0,npiv00)
-    #print('CE0:',CE0)
-    Ab=np.hstack((A,-b))   # augmented matrix for the first order linear system
-    #print('Ab:',Ab)
-    niter=0
+    num_iter=0
     num_box=1
     xbest=np.zeros((p,1)) # intialize xbest
     supp0,xbest[supp0]=getklargest(absxrelax,k)
@@ -94,26 +25,6 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     #print('xbest,fbest:',xbest,fbest)
     B0=np.ones(p,dtype=int) # initial box of integer ones
 
-    def rowech():
-        """ row reduced echelon form
-        """
-        num_piv=npiv0
-        idx_piv=np.array(range(num_piv))
-        E0=Ab[idx_piv,:]
-        num_col=p+1
-        for j in range(num_piv):
-            E0[j,j:num_col]=E0[j,j:num_col]/E0[j,j] # make the pivot entry 1
-            invjpiv=-E0[j,j:num_col]
-            for k in range(j+1,num_piv):
-                E0[k,j:num_col]=invjpiv*E0[k,j]+E0[k,j:num_col] # EROs
-        
-        return E0
-
-
-    E0=rowech()
-    print('E0:',E0)
-    xlb=backsub(p,npiv0,E0,np.array(range(npiv0)))
-    #xlb[ipiv0]=xlb
     fxlb=fx(xlb,A,b,c)
     xhat0=xlb
     fxhat0=fxlb
@@ -125,9 +36,9 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     L = []
     heapq.heappush( L, (fxlb, B0, 0, p, 0, xlb) )  # add the intial box to the list
 
-
     while True:
 
+        num_iter += 1
         # check for convergence criteria
         if num_box==0:
             print('alg. converged')
@@ -135,124 +46,27 @@ def main(p,n,y,X,A,b,c,k,xrelax):
         
         # select a new box to process
         Y=heapq.heappop(L) # V[0]=fxlb, V[1]=box, V[2]=#0, V[3]=#1, V[4]=#2, V[5]=xlb
-        num_box=num_box-1
-
-        # branch and process the child boxes
-        par_dir=np.arange(Y[1].size)[Y[1]==1][::-1]  # indices of partition direction in decreasing order
-        stop_par=0  # to stop the partition loop
-        isDC2true=0     # flag to avoid checking DC2 for every flag 2 child box
-        uplimit=p-k-Y[2] 
-        num_child=min(uplimit,float('inf'))
-
-        for j in range(num_child):
-
-            jhat=par_dir[j]  # partition index
-            temp=Y[1]
-            temp[jhat]=0    # child box with 0 flag
-            V0=(temp , Y[2]+1, Y[3]-1, Y[4]) # initialization 
-            temp=Y[1]
-            temp[jhat]=2   # child box with 2 flag
-            V2=(temp , Y[2], Y[3]-1, Y[4]+1)
-
-            for ichild in range(2):
-
-                if ichild==0: # box with 0 flag
-                    if j==(uplimit-1): # reached leaf node with k flag 1 in it
-                        # find the feasible point
-                        if V0[2]<npiv0: # if #flag 1 < rank X
-                            if V0[3]==0: # if there is no flag 2 in the box
-                                xhat=backsub(p, V0[2], E0, range(V0[2]))
-
-                            else:
-                                id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
-                                xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
-
-                            fxhat=fx(xhat, A, b, c)
-
-                        else:
-                            xhat=xhat0
-                            fxhat=fxhat0
-
-                        # update xbest ,fbest if possible
-                        if fxhat<fbest:
-                            xbest=xhat
-                            fbest=fxhat
-                            
-                        continue # with the next ichild iteration
-
-                    # sampling call
-                    xtilde,fxtilde=getfeasiblept(p,k,V0[0],A,b,c,xrelax,absxrelax)
-                    if fxtilde<fbest:
-                        xbest=xtilde
-                        fbest=fxtilde
-
-                    # inclusion function call
-                    if V0[2] < npiv0: #  if #1 < npiv0
-                        if V0[3]==0: # no flag 0 in the box
-                            xhat=backsub(p, V0[2], E0, range(V0[2]))
-                        else:
-                            id=newpivcol(V0[2], V0[3], p, npiv0, n, V0[0], X, CE0)
-                            xhat=efupdate(V0[2], V0[3], p, npiv0, id, Ab, E0)
-                            
-                        fxhat=fx(xhat,A,b,c)
-
-                    else: # if #flag 1 >= rank X
-                            xhat=xhat0
-                            fxhat=fxhat0
-                        
-                    xlb=xhat
-                    fxlb=fxhat0
-
-                    # check DC1
-                    if fbest<=fxlb:
-                        stop_par=1 # stop the j loop
-                        continue # with the next ichild iteration
-
-                    Y=(fxlb,) + V0 + (xlb,)
-
-                else: # box with 2 flag
-
-                    # check DC2
-                    if j==0:
-                        if Y[4]+1==k:
-                            isDC2true=1 # DC2 is satisfied for all the subsequent child boxes,check it only once
-
-                    if isDC2true==1:
-                        # call lb QM
-                        xhat,fxhat=quad_min(p,V2[0],A,b,c,xrelax)
-                        # update xbest, fbest if possible
-                        if fxhat<fbest:
-                            xbest=xhat
-                            fbest=fxhat
-                        
-                        continue # with the next iter of j loop
-
-                    # call feasiblity sampling
-                    xtilde,fxtilde=getfeasiblept(p,k,V2[0],A,b,c,xrelax,absxrelax)
-                    if fxtilde<fbest:
-                        xbest=xtilde
-                        fbest=fxtilde
-                            
-                    xlb=Y[5]
-                    fxlb=Y[0]
-
-                    # check DC1
-                    if fbest<=fxlb:
-                        continue # discard the box
-
-                    heapq.heappush( L, (fxlb,) + V2 + (xlb,) )  # add the V2 box to the list
-            
-
+        num_box -= 1
+        
     
     # final output
-    xout=np.zeros((p,1))
-    xout[ipiv0]=xbest[:npiv0]
-    xout[ipiv1]=xbest[npiv0:p]
+    xout=xbest
     fout=fbest
 
     return xout, fout
-                                
 
+#============================================================================================================================
+def branch(p,n,y,X,A,b,c,k,L,Y,xbest,fbest,xrelax,absxrelax,npiv0,num_box,box_age_ctr,num_cuts):
+    """
+    
+    """
+    # branch and process the child boxes
+    par_dir=np.arange(Y[1].size)[Y[1]==1]  # indices of partition direction in increasing order
+    num_child, cut_dir, child_boxes=getchildboxes(num_cuts,par_dir,Y[6],Y[2:6])
+
+    for j in range(num_child):
+
+#============================================================================================================================                                
 def fx(x,A,b,c):
     """ fx=0.5 xAx + bx +c
     
@@ -267,61 +81,79 @@ def fx(x,A,b,c):
     #value=(Qx.T @ (D*Qx)) + b.T @ x + c
     value=0.5 * x.T @ A @ x  + b.T @ x + c 
 
-    return value
+    return value[0][0]
 
-def quad_fun(x,A,b,c):
-    " x is 1D array"
-    value= 0.5 * x @ A @ x.T + x @ b.T + c
-    return value
-
-def grad_fun(x,A,b,c):
-    "g = Ax+b"
-    value= x @ A + b
-    return value
-
-def quad_min(p,box,A,b,c,x0):
+#============================================================================================================================
+def quad_min(p,supp,A,b,c,x0):
     " quadratic minimization using conjugate gradient method"
 
     import numpy as np
     from scipy.optimize import minimize
+
+    def quad_fun(x,A,b,c):
+        " x is 1D array"
+        value= 0.5 * x @ A @ x.T + x @ b.T + c
+        
+        return value
+
+    def grad_fun(x,A,b,c):
+        "g = Ax+b"
+        value= x @ A + b
+        
+        return value
     
-    supp=np.where(box!=0)[0] # find the indices of flag 1 and flag 2
-    start_pt=x0[supp]
+    #print('supp:',supp)
+    start_pt=np.reshape(x0[supp],(1,-1))[0]
     Ahat=A[np.ix_(supp,supp)]
     bhat=b[supp]
-    bhat=np.reshape(bhat,(1,-1)) # convert into a 1D array
-
-    obj=minimize( quad_fun, start_pt, method='CG', jac=grad_fun)
+    bhat=np.reshape(bhat,(1,-1))[0] # convert into a 1D array
+    #print('supp,Ahat,bhat,c,start_pt:',supp,Ahat,bhat,c,start_pt)
+    obj=minimize( quad_fun, start_pt, (Ahat,bhat,c), method='CG', jac=grad_fun)
     xout=np.zeros((p,1))
     xout[supp]=np.reshape(obj.x,(-1,1))
     fout=obj.fun
 
     return xout, fout
 
-def getfeasiblept(p,k,box,A,b,c,xrelax,absxrelax):
+#============================================================================================================================
+def getfeasiblept(p,n,y,X,A,b,c,k,box,xrelax,absxrelax):
     "Find a feasible point"
     
     import numpy as np
     from scipy.optimize import minimize
+    import projgrad as pg
 
-    supp1=np.where(box!=0)[0] # find the indices of flag 1 and flag 2
-    print('supp1:',supp1)
-    local_supp,_=getklargest(absxrelax[supp1],k)
-    print('local_supp:',local_supp)
-    supp=supp1[local_supp]
-    start_pt=xrelax[supp]
-    start_pt=np.reshape(start_pt,(1,-1)) # convert into a 1D array
-    Ahat=A[np.ix_(supp,supp)]
-    bhat=b[supp]
-    bhat=np.reshape(bhat,(1,-1))
-    #print('bhat:',bhat)
-    obj=minimize( quad_fun, start_pt[0], (Ahat,bhat[0],c) , method='CG', jac=grad_fun)
+    def quad_fun(x,A,b,c):
+        " x is 1D array"
+        value= 0.5 * x @ A @ x.T + x @ b.T + c
+        return value
+
+    def grad_fun(x,A,b,c):
+        "g = Ax+b"
+        value= x @ A + b
+        return value
+
+    #supp1=np.where(box!=0)[0] # find the indices of flag 1 and flag 2
+    supp1=[]
+    ctr=0
+    for i in range(p):
+        if box[i]!=0:
+            supp1 = np.concatenate((supp1,[i]))
+            ctr += 1
+
+    supp1=np.array(supp1,dtype=int)  
+    #print('box,k:',box,k)
+    #print('supp1:',supp1)
+
+    xpg,fxpg=pg.main(ctr,n,y,X[:,supp1],k,num_runs=5) # xpg is in the reduced dim.
+    #print('xpg:',xpg)
     xout=np.zeros((p,1))
-    xout[supp]=np.reshape(obj.x,(-1,1))
-    fout=obj.fun
+    xout[supp1]=xpg
+    fout=fxpg
 
-    return xout,fout
-    
+    return xout, fout
+
+#============================================================================================================================
 def getklargest(given_list,select_k):
         """ Extract a sub array of size kx1 with k largest entries
     
@@ -338,3 +170,56 @@ def getklargest(given_list,select_k):
         indices_k_largest=np.argpartition(given_list_1D,-select_k)[-select_k:]
         list_k_largest=given_list[indices_k_largest]
         return indices_k_largest,list_k_largest
+
+#============================================================================================================================
+def getchildboxes(num_cuts,par_dir,xlb,V):
+    """ generate child boxes
+    
+    """
+    import numpy as np
+
+    def getallvectices(ii,n,K,V,num_cuts,ids_array,S):
+        """ generate 2^(num_cuts) boxes after cutting along the provided direction
+
+           ii : num_cuts
+           n : num_cuts
+           K : indices of the directions to be cut
+           V : the selected parent box to be partitioned with the attributes: box array, num 0, num 1, and num 2 flags
+           ids_array : array of dim 1 x num_cuts to save the 
+           S : list of tuples/boxes to save the box attributes
+        """
+        for i in range(2):
+            ids_array[ii] = i
+            if ii > 0:
+                S=getallvectices(ii-1,n,K,V,num_cuts,ids_array,S)
+
+            else:
+                
+                # V[0]= box array, V[1]= # 0 flag, V[2]= # 1 flag, V[3]= # 2 flag 
+                Vtemp=V.copy() # make a copy of the original box
+                for j in range(num_cuts):
+                    if ids_array[j] == 0:
+                        Vtemp[K[j]] = 0 
+                        Vtemp[1] += 1    # increase the no. of flag 0 by 1
+                        Vtemp[2] -= 1    # decrease the no. of flag 1 by 1
+
+                    elif ids_array[j] == 1:
+                        Vtemp[K[j]] = 2 
+                        Vtemp[3] += 1    # increase the no. of flag 2 by 1
+                        Vtemp[2] -= 1    # decrease the no. of flag 1 by 1
+
+                    
+                S.append(Vtemp) # add the new box to the list
+
+
+        return S
+
+
+    S = []  # list of tuples/boxes with length 2^num_cuts 
+    cut_dir=getklargest(np.abs(xlb[par_dir]),num_cuts) # the indices of the coordinate direction to be cut along
+    ids_array=np.zeros(num_cuts) 
+    S=getallvectices(num_cuts,num_cuts,cut_dir,V,num_cuts,ids_array,S)
+    num_child=2 ** num_cuts 
+
+    return num_child, cut_dir, S
+#============================================================================================================================

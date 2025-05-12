@@ -88,7 +88,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     Ab=np.hstack((A,-b))   # augmented matrix for the first order linear system
     #print('Ab:',Ab)
     B0=np.ones(p,dtype=int) # initial box of integer ones
-    niter=0
+    num_iter=0
     num_box=1
     xbest,fbest=getfeasiblept(p,n,y,X,A,b,c,k,B0,xrelax,absxrelax)
     #xbest=np.zeros((p,1)) # intialize xbest
@@ -130,16 +130,16 @@ def main(p,n,y,X,A,b,c,k,xrelax):
 
     while True:
 
-        niter += 1
+        num_iter += 1
         # check for convergence criteria
         if num_box==0:
             print('alg. converged')
             break
         
         # select a new box to process
-        Y = heapq.heappop(L) # V[0]=fxlb, V[2]=box, V[3]=#0, V[4]=#1, V[5]=#2, V[6]=xlb
+        Y = heapq.heappop(L) # V[0]=fxlb, V[1]= age counter,  V[2]=box, V[3]=#0, V[4]=#1, V[5]=#2, V[6]=xlb
         #print('Selected node Y:',Y)
-        num_box=num_box-1
+        num_box -= 1
 
         # branch over Y
         box_age_ctr, num_box, fbest, xbest, L = branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrelax,npiv0,num_box,box_age_ctr)
@@ -302,7 +302,7 @@ def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrel
                     #print('V2 deleted DC1: fbest,fxlb',fbest,fxlb)
                     continue # discard the box
 
-                num_box = num_box+1
+                num_box += 1
                 #print('V2 added:',V2)
                 box_age_ctr += 1
                 V2temp =(fxlb, box_age_ctr,  V2[0] , V2[1] , V2[2] , V2[3] , xlb)
