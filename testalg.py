@@ -4,6 +4,7 @@ def main(p,n,k,b0,mu,sigma,num_instances,num_alg,alg_flag):
     from scipy import linalg
     import time
 
+    import ibb
     import ibbef 
     import mio 
     import projgrad
@@ -33,28 +34,37 @@ def main(p,n,k,b0,mu,sigma,num_instances,num_alg,alg_flag):
         # find an initial feasible point
         x0,fx0=projgrad.main(p,n,y,X,k)
         print('x0,fx0:',x0,fx0)
+        
+        if alg_flag[0]==1:
+            tstart=time.process_time() 
+            xibb, rss_each_inst[0,j]=ibb.main(p,n,y,X,A,b,c,k,x0)
+            tend=time.process_time()
+            print('start, end:',tstart,tend)
+            cpu_time_each_inst[0,j]=tend-tstart
+            print('xibb:',xibb)
+            print('fibb:',rss_each_inst[0,j])
+            print('CPU ibb:',cpu_time_each_inst[0,j])
 
-        if alg_flag[0]==1:  # test ibbef
-            tstart1=time.process_time()
-            #x0=b
-            xibbef, rss_each_inst[0,j]=ibbef.main(p,n,y,X,A,b,c,k,x0)
-            tend1=time.process_time()
-            print('start, end:',tstart1,tend1)
-            cpu_time_each_inst[0,j]=tend1-tstart1
+        if alg_flag[1]==1:  # test ibbef
+            tstart=time.process_time()
+            xibbef, rss_each_inst[1,j]=ibbef.main(p,n,y,X,A,b,c,k,x0)
+            tend=time.process_time()
+            print('start, end:',tstart,tend)
+            cpu_time_each_inst[1,j]=tend-tstart
             print('xibbef:',xibbef)
-            print('fibbef:',rss_each_inst[0,j])
-            print('cpu ibbef:',cpu_time_each_inst[0,j])
+            print('fibbef:',rss_each_inst[1,j])
+            print('CPU ibbef:',cpu_time_each_inst[1,j])
 
-        if alg_flag[1]==1: # test mio
+        if alg_flag[2]==1: # test mio
             low=-4*np.ones((p,1))
             up=4*np.ones((p,1))
-            tstart2=time.process_time()
-            xmio, rss_each_inst[1,j] = mio.main(p,n,y,X,A,b,c,k,low,up,x0)
-            tend2=time.process_time()
-            cpu_time_each_inst[1,j]=tend2-tstart2
+            tstart=time.process_time()
+            xmio, rss_each_inst[2,j] = mio.main(p,n,y,X,A,b,c,k,low,up,x0)
+            tend=time.process_time()
+            cpu_time_each_inst[2,j]=tend-tstart
             print('xmio:',xmio)
-            print('fmio:',rss_each_inst[1,j])
-            print('cpu mio:',cpu_time_each_inst[1,j])
+            print('fmio:',rss_each_inst[2,j])
+            print('CPU mio:',cpu_time_each_inst[2,j])
 
     rss_each_alg=np.mean(rss_each_inst,axis=1)   # average data for all the instances for each algorithm
     cpu_time_each_alg=np.mean(cpu_time_each_inst,axis=1)

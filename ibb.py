@@ -1,4 +1,4 @@
-def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1):
+def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1,max_cputime=600,max_df_iter=500):
     """IBB+ with lb using recycled echelon form
 
        xrelax: xRelaxedOpt
@@ -8,9 +8,11 @@ def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1):
     from scipy import linalg
     from scipy.optimize import minimize
     import heapq
+    import time
 
     epsilon=sys.float_info.epsilon    
-    
+    cpustart=time.process_time() # save the starting cpu time
+    stopflag = 0   # initialization  
     absxrelax=np.abs(xrelax) # absolute value of xrelax array
     print('A:',A)
     print('b:',b)
@@ -22,32 +24,49 @@ def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1):
     xbest=np.zeros((p,1)) # intialize xbest
     supp0,xbest[supp0]=getklargest(absxrelax,k)
     fbest=fx(xbest[supp0],A[np.ix_(supp0,supp0)],b[supp0],c)
+    last_fbest_update_iter=num_iter
     #print('xbest,fbest:',xbest,fbest)
     B0=np.ones(p,dtype=int) # initial box of integer ones
-
-    fxlb=fx(xlb,A,b,c)
-    xhat0=xlb
-    fxhat0=fxlb
+    
+    xlb, fxlb=quad_min(p,np.array(range(p),dtype=int),A,b,c,xrelax)
     #print('xlb :',xlb)
     #print('fxlb:',fxlb)
     #print('size fxlb:',np.size(fxlb))
-
+    print('p type:',np.dtype(p))
     # Initialize the list L
     L = []
-    heapq.heappush( L, (fxlb, B0, 0, p, 0, xlb) )  # add the intial box to the list
+    box_age_ctr=0 # unique for every box we are adding, the oldest box will have the smallest counter
+    heapq.heappush( L, ( fxlb, box_age_ctr , B0 , 0, p, 0,  xlb) )  # add the intial box to the list
 
     while True:
 
         num_iter += 1
+        cpulapsed=time.process_time()-cpustart
         # check for convergence criteria
         if num_box==0:
             print('alg. converged')
             break
+
+        if cpulapsed>=max_cputime:
+            print('max CPU time reached')
+            stopflag = 6 
+            break
+
+        if (num_iter-last_fbest_update_iter)>max_df_iter:
+            print('fbest did not get updated for the given no. of iter')
+            stopflag = 4
+            break
+        
         
         # select a new box to process
         Y=heapq.heappop(L) # V[0]=fxlb, V[1]=box, V[2]=#0, V[3]=#1, V[4]=#2, V[5]=xlb
-        num_box -= 1
-        
+        num_box -= 1 
+        print('Y:',Y[0],Y[1],Y[2],Y[3],Y[4],Y[5])
+        is_fbest_updated, box_age_ctr, num_box, fbest, xbest, L=branch(p,n,y,X,A,b,c,k,L,Y,xbest,fbest,xrelax,absxrelax,num_box,box_age_ctr,num_cuts)
+
+        if is_fbest_updated==1:
+            last_fbest_update_iter = num_iter
+
     
     # final output
     xout=xbest
@@ -56,15 +75,65 @@ def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1):
     return xout, fout
 
 #============================================================================================================================
-def branch(p,n,y,X,A,b,c,k,L,Y,xbest,fbest,xrelax,absxrelax,npiv0,num_box,box_age_ctr,num_cuts):
+def branch(p,n,y,X,A,b,c,k,L,Y,xbest,fbest,xrelax,absxrelax,num_box,box_age_ctr,num_cuts):
     """
     
     """
+    import numpy as np
+    import heapq
+
+    is_fbest_updated = 0 # flag check if the fbest gets updated for this call of branch
     # branch and process the child boxes
-    par_dir=np.arange(Y[1].size)[Y[1]==1]  # indices of partition direction in increasing order
+    par_dir=np.arange(Y[2].size)[Y[2]==1]  # indices of partition direction in increasing order
     num_child, cut_dir, child_boxes=getchildboxes(num_cuts,par_dir,Y[6],Y[2:6])
 
     for j in range(num_child):
+        #print('child box:',child_boxes[j])
+        # check DC2
+        if child_boxes[j][3]>k:  # If no. of flag 2 > k
+            continue # discard the box, go to the next child box
+
+        # check DC5
+        if (child_boxes[j][2]+child_boxes[j][3])==k: # if no. of flag 1 + flag 2 = k
+            supp=np.where(child_boxes[j][0]!=0)[0] # indices of flag 1 and flag 2
+            xlb, fxlb=quad_min(p,supp,A,b,c,xrelax)
+            # update fbest if possible
+            if fxlb<fbest:
+                fbest = fxlb
+                xbest = xlb
+                is_fbest_updated = 1
+            
+            continue # discard the box, go to the next child box
+
+        if num_cuts>1: 
+            if (child_boxes[j][2]+child_boxes[j][3]) < k: # if no. of flag 1 + flag 2 < k
+                continue # discard the box, go to the next child box
+
+        # find a feasible point
+        xtilde, fxtilde=getfeasiblept(p,n,y,X,A,b,c,k,child_boxes[j][0],xrelax,absxrelax)
+
+        # update fbest if possible
+        if fxtilde<fbest:
+            fbest = fxtilde
+            xbest = xtilde
+            is_fbest_updated = 1
+
+        # find lb f(V)
+        supp=np.where(child_boxes[j][0]!=0)[0] # indices of flag 1 and flag 2
+        xlb, fxlb=quad_min(p,supp,A,b,c,xrelax)
+
+        # check DC1
+        if fbest<=fxlb:  # <= because we only want to find one global optimal
+            continue  # discard the box, go to the next child box
+
+        # add the box to the list for further processing
+        num_box += 1
+        box_age_ctr += 1
+        #V2temp =(fxlb, box_age_ctr, child_boxes[j][0] , child_boxes[j][1], child_boxes[j][2] ,child_boxes[j][3] , xlb)
+        heapq.heappush( L, (fxlb, box_age_ctr, child_boxes[j][0] , child_boxes[j][1], child_boxes[j][2] ,child_boxes[j][3] , xlb) ) # push the box in the list
+
+    return is_fbest_updated, box_age_ctr, num_box, fbest, xbest, L   
+
 
 #============================================================================================================================                                
 def fx(x,A,b,c):
@@ -178,7 +247,7 @@ def getchildboxes(num_cuts,par_dir,xlb,V):
     """
     import numpy as np
 
-    def getallvectices(ii,n,K,V,num_cuts,ids_array,S):
+    def getallvectices(ii,K,V,num_cuts,ids_array,S):
         """ generate 2^(num_cuts) boxes after cutting along the provided direction
 
            ii : num_cuts
@@ -191,24 +260,27 @@ def getchildboxes(num_cuts,par_dir,xlb,V):
         for i in range(2):
             ids_array[ii] = i
             if ii > 0:
-                S=getallvectices(ii-1,n,K,V,num_cuts,ids_array,S)
+                S=getallvectices(ii-1,K,V,num_cuts,ids_array,S)
 
             else:
                 
                 # V[0]= box array, V[1]= # 0 flag, V[2]= # 1 flag, V[3]= # 2 flag 
-                Vtemp=V.copy() # make a copy of the original box
+                V0 = np.array(V[0])   # make a list of the tuple entries
+                num0flag = V[1]
+                num1flag = V[2]
+                num2flag = V[3]
                 for j in range(num_cuts):
                     if ids_array[j] == 0:
-                        Vtemp[K[j]] = 0 
-                        Vtemp[1] += 1    # increase the no. of flag 0 by 1
-                        Vtemp[2] -= 1    # decrease the no. of flag 1 by 1
+                        V0[K[j]] = 0 
+                        num0flag += 1    # increase the no. of flag 0 by 1
+                        num1flag -= 1    # decrease the no. of flag 1 by 1
 
                     elif ids_array[j] == 1:
-                        Vtemp[K[j]] = 2 
-                        Vtemp[3] += 1    # increase the no. of flag 2 by 1
-                        Vtemp[2] -= 1    # decrease the no. of flag 1 by 1
+                        V0[K[j]] = 2 
+                        num2flag += 1    # increase the no. of flag 2 by 1
+                        num1flag -= 1    # decrease the no. of flag 1 by 1
 
-                    
+                Vtemp = (V0, num0flag, num1flag, num2flag)     
                 S.append(Vtemp) # add the new box to the list
 
 
@@ -216,9 +288,12 @@ def getchildboxes(num_cuts,par_dir,xlb,V):
 
 
     S = []  # list of tuples/boxes with length 2^num_cuts 
-    cut_dir=getklargest(np.abs(xlb[par_dir]),num_cuts) # the indices of the coordinate direction to be cut along
+    cut_dir_local,_=getklargest(np.abs(xlb[par_dir]),num_cuts) # the indices of the coordinate direction to be cut along
+    cut_dir = par_dir[cut_dir_local]
+    #print('cut_dir:',cut_dir)
+    #cut_dir=np.array(cut_dir,dtype=int)
     ids_array=np.zeros(num_cuts) 
-    S=getallvectices(num_cuts,num_cuts,cut_dir,V,num_cuts,ids_array,S)
+    S=getallvectices(num_cuts-1,cut_dir,V,num_cuts,ids_array,S)
     num_child=2 ** num_cuts 
 
     return num_child, cut_dir, S
