@@ -531,7 +531,7 @@ def getfeasiblept(p,n,y,X,A,b,c,k,box,xrelax,absxrelax):
     
     import numpy as np
     from scipy.optimize import minimize
-    import projgrad as pg
+    import main.projgrad as pg
 
     def quad_fun(x,A,b,c):
         " x is 1D array"

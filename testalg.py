@@ -4,10 +4,10 @@ def main(p,n,k,b0,mu,sigma,num_instances,num_alg,alg_flag):
     from scipy import linalg
     import time
 
-    import ibb
-    import ibbef 
-    import mio 
-    import projgrad
+    import main.ibb as ibb
+    import main.ibbef as ibbef 
+    import main.mio as mio 
+    import main.projgrad as projgrad
 
     # initialize the arrays to save the output
     rss_each_inst=np.zeros((num_alg,num_instances))
