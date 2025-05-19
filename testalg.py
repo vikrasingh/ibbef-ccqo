@@ -1,4 +1,4 @@
-def main(p,n,k,b0,mu,sigma,num_instances,num_alg,alg_flag):
+def main(p,n,k,b0,snr,mu,sigma,num_instances,num_alg,alg_flag):
     
     import numpy as np
     from scipy import linalg
@@ -10,9 +10,10 @@ def main(p,n,k,b0,mu,sigma,num_instances,num_alg,alg_flag):
     import main.projgrad as projgrad
 
     # initialize the arrays to save the output
-    rss_each_inst=np.zeros((num_alg,num_instances))
-    cpu_time_each_inst=np.zeros((num_alg,num_instances))
-    stop_flag_each_inst=np.zeros((num_alg,num_instances))
+    rss_each_inst = np.zeros((num_alg,num_instances))
+    cpu_time_each_inst = np.zeros((num_alg,num_instances))
+    stop_flag_each_inst = np.zeros((num_alg,num_instances))
+    sol_each_alg = np.zeros((num_alg,p))
     for j in range(num_instances):
         seed=np.random.seed(j)
         X = np.random.multivariate_normal(mu, sigma,n )
@@ -20,7 +21,9 @@ def main(p,n,k,b0,mu,sigma,num_instances,num_alg,alg_flag):
         X= X - colmeans             # make the column mean zero
         col_norm = np.linalg.norm(X, axis=0, keepdims=True) # find 2-norm of each col
         X = X / col_norm 
-        e = np.random.normal(size=n) # sample error from gaussian distribution
+        Xb0 = X @ b0 
+        sigma_var = np.sqrt( (Xb0.T @ Xb0)/snr )
+        e = np.random.normal(size=n)*sigma_var # sample error from gaussian distribution
         e = np.reshape(e,(-1,1))   # make it a col array
         y = X @ b0 + e             # generate the response vector
         y = np.reshape(y, (-1,1))  # make it a col array
@@ -66,9 +69,12 @@ def main(p,n,k,b0,mu,sigma,num_instances,num_alg,alg_flag):
             print('fmio:',rss_each_inst[2,j])
             print('CPU mio:',cpu_time_each_inst[2,j])
 
-    rss_each_alg=np.mean(rss_each_inst,axis=1)   # average data for all the instances for each algorithm
-    cpu_time_each_alg=np.mean(cpu_time_each_inst,axis=1)
-    stop_flag_each_alg=np.mean(stop_flag_each_inst,axis=1)
+    rss_each_alg = np.mean(rss_each_inst,axis=1)   # average data for all the instances for each algorithm
+    cpu_time_each_alg = np.mean(cpu_time_each_inst,axis=1)
+    stop_flag_each_alg = np.mean(stop_flag_each_inst,axis=1)
+    sol_each_alg[0,:] = xibb.T
+    sol_each_alg[1,:] = xibbef.T
+    sol_each_alg[2,:] = xmio.T 
 
-    return stop_flag_each_alg, cpu_time_each_alg, rss_each_alg
+    return stop_flag_each_alg, cpu_time_each_alg, rss_each_alg, sol_each_alg
     
