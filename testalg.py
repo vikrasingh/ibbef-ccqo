@@ -1,4 +1,4 @@
-def main(p,n,k,b0,snr,mu,sigma,num_instances,num_alg,alg_flag):
+def main(p,n,k,b0,snr,mu,Sigma,num_instances,num_alg,alg_flag):
     
     import numpy as np
     from scipy import linalg
@@ -16,14 +16,14 @@ def main(p,n,k,b0,snr,mu,sigma,num_instances,num_alg,alg_flag):
     sol_each_alg = np.zeros((num_alg,p))
     for j in range(num_instances):
         seed=np.random.seed(j)
-        X = np.random.multivariate_normal(mu, sigma,n )
+        X = np.random.multivariate_normal(mu, Sigma,n )
         colmeans=np.mean(X,axis=0)  # find the mean of each column
         X= X - colmeans             # make the column mean zero
         col_norm = np.linalg.norm(X, axis=0, keepdims=True) # find 2-norm of each col
         X = X / col_norm 
         Xb0 = X @ b0 
-        sigma_var = np.sqrt( (Xb0.T @ Xb0)/snr )
-        e = np.random.normal(size=n)*sigma_var # sample error from gaussian distribution
+        sigma = np.sqrt( (b0.T @ Sigma @ b0)/snr )
+        e = np.random.normal(size=n)*sigma # sample error from gaussian distribution
         e = np.reshape(e,(-1,1))   # make it a col array
         y = X @ b0 + e             # generate the response vector
         y = np.reshape(y, (-1,1))  # make it a col array
