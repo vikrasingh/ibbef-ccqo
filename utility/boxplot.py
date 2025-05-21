@@ -24,4 +24,12 @@ def main(data, linespecs=None, linewidth=1.6,legendnames=None,
     plt.title(f'BSS')
     plt.grid(True)
     plt.xticks([1, 2, 3], ['IBB','IBBEF', 'MIO'])
-    plt.show() # show the plot   
+    plt.draw() # show the plot   
+    
+    # save the plot as png
+    fig_handle=plt.gcf()   # get the handle to the current fig
+    #fig_handle.savefig("bp_relgap.png")
+
+    # save to PDF
+    fig_handle.savefig("bp_relgap.pdf")
+    

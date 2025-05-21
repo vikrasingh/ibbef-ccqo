@@ -199,3 +199,10 @@ def main(data, linespecs=None, linewidth=1.5, thmax=None,
             plt.rc('text', usetex=usetexorig)
         except e:
             print('Problem changing use of LaTeX.')
+
+    # save the plot as png
+    fig_handle=plt.gcf()   # get the handle to the current fig
+    #fig_handle.savefig("pp_cputime.png")
+
+    # save to PDF
+    fig_handle.savefig("pp_cputime.pdf")
