@@ -61,7 +61,7 @@ def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1,max_cputime=600,max_df_iter=500):
         # select a new box to process
         Y=heapq.heappop(L) # V[0]=fxlb, V[1]=box, V[2]=#0, V[3]=#1, V[4]=#2, V[5]=xlb
         num_box -= 1 
-        print('Y:',Y[0],Y[1],Y[2],Y[3],Y[4],Y[5])
+        #print('Y:',Y[0],Y[1],Y[2],Y[3],Y[4],Y[5])
         is_fbest_updated, box_age_ctr, num_box, fbest, xbest, L=branch(p,n,y,X,A,b,c,k,L,Y,xbest,fbest,xrelax,absxrelax,num_box,box_age_ctr,num_cuts)
 
         if is_fbest_updated==1:

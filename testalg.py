@@ -59,8 +59,9 @@ def main(p,n,k,b0,snr,mu,Sigma,num_instances,num_alg,alg_flag):
             print('CPU ibbef:',cpu_time_each_inst[1,j])
 
         if alg_flag[2]==1: # test mio
-            low=-4*np.ones((p,1))
-            up=4*np.ones((p,1))
+            M=2*np.abs(x0).max() # uniform bound for the box
+            low=-M*np.ones((p,1))
+            up=M*np.ones((p,1))
             tstart=time.process_time()
             xmio, rss_each_inst[2,j] = mio.main(p,n,y,X,A,b,c,k,low,up,x0)
             tend=time.process_time()

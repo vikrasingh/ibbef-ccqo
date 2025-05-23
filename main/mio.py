@@ -16,6 +16,9 @@ def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax):
     def dense_optimize(rows, cols, c, Q, A, sense, rhs, lb, ub, vtype, solution):
         model = gp.Model()
 
+        # Set the OutputFlag parameter to 0 to suppress intermediate output
+        model.setParam('OutputFlag', 0)
+
         # Add variables to model
         vars = []
         for j in range(cols):
