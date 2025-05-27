@@ -1,3 +1,7 @@
+import numpy as np
+from scipy import linalg
+import utility.getklargest as gkl
+
 def main(p,n,y,X,k,box,xrelax):
     """ Sequential Feature Swapping for BSS
     
@@ -9,12 +13,9 @@ def main(p,n,y,X,k,box,xrelax):
        xrelax is the ols solution 
     """
 
-    import numpy as np
-    from scipy import linalg
-    import getklargest as gkl
-
     stop_flag = 0 
     num_iter = 0
+    #print('box:',box)
 
     I0 = []
     ctr = 0
@@ -31,7 +32,8 @@ def main(p,n,y,X,k,box,xrelax):
     fitted_model = linalg.lstsq(X[:,I], y) # least square fit
     xhat = fitted_model[0]
     fxI = np.linalg.norm(y - X[:,I] @ xhat) ** 2 
-    Ic = setdiff(np.array(range(p)),I)
+    Ic = setdiff(np.array(range(p),dtype=int),I)
+    #print('I,fxI:',I,fxI)
 
     while True:
         num_iter += 1
@@ -48,6 +50,7 @@ def main(p,n,y,X,k,box,xrelax):
             I = setunion(Iminusi,jstar)  # new support
             Ic = setunion( setdiff(Ic,jstar),istar )
             fxI = fxIplusj
+            #print('I,fxI:',I,fxI)
 
         else:
             break
@@ -67,8 +70,6 @@ def leastSigniI(ki,y,X,I,fxI):
        return x* such that S(x*)=min( f(X-xj)-f(X) ) for xj in I
        ki is the no. of predictors in I
     """
-    import numpy as np
-    from scipy import linalg
 
     if ki == 1:
         istar = I
@@ -96,8 +97,6 @@ def mostSigniIc(p,ki,y,X,I,Ic,fxI):
        return x* such that S(x*)=max( f(I) - f(I+xj) ) for xj in Ic
        ki is the no. of predictors in I
     """
-    import numpy as np
-    from scipy import linalg
 
     pS = -np.inf
     for i in range(p-ki):
@@ -119,17 +118,42 @@ def setdiff(I,J):
     
        of elements in the set I
     """
-    import numpy as np
  
-    n = len(I)
-    S = np.array(n,dtype=int) # initialization
-    ctr = -1 
-    for i in range(n):
+    n = I.shape
+    m = J.shape
+
+    if n == () and m == (): # I and J are both integers
+        if I != J:
+            S = I
+        
+        return S
+
+    if n == ():  # I is an integer and J is a list
+        if I not in J:
+            S = I
+        else:
+            S = []
+
+        return S
+
+    S = np.zeros(n,dtype=int) # initialization
+    ctr = -1
+
+    if m == (): # J is just an integer and I is a list
+        for i in range(n[0]):
+            if I[i] != J:
+                ctr += 1
+                S[ctr] = I[i]
+            
+        S = S[:(ctr+1)]
+        return S
+
+    for i in range(n[0]):
         if I[i] not in J:
             ctr += 1
             S[ctr] = I[i]
         
-    S = S[:ctr]
+    S = S[:(ctr+1)]
     return S
 
 #======================================================================================
@@ -137,19 +161,50 @@ def setunion(I,J):
     """ return the set S= I union J 
 
     """
-    import numpy as np
 
-    n = len(I)
-    m = len(J)
-    S = np.array(n+m,dtype=int)
-    S[:n] = I 
+    n = I.shape
+    m = J.shape
+
+    if n == () and m == (): # if I and J are both integers
+        if I != J:
+            S = np.array(range(2),dtype=int)
+            S[0] = I
+            S[1] = J
+        
+        return S
+    
+
+    if n == (): # if I is an integer and J is a list of integers
+        if I not in J:
+            S = np.array(range(m[0]+1),dtype=int)
+            S[0] = I
+            S[1:(m[0]+1)] = J      
+        else:
+            S = J
+
+        return S
+
+
+    if m == (): # if J is an integer and I is a list of integers
+        if J not in I:
+            S = np.array(range(n[0]+1),dtype=int)
+            S[:n[0]] = I
+            S[n[0]] = J
+        else:
+            S = I
+                
+        return S
+
+    
+    S = np.array(range(n[0]+m[0]),dtype=int)
+    S[:n[0]] = I 
     ctr = -1
-    for i in range(m):
-        if J[ctr] not in I:
+
+    for i in range(m[0]): # I and J both are list of integers
+        if J[i] not in I:
             ctr += 1
-            S[n+ctr] = J[ctr]
+            S[n[0]+ctr] = J[i]
 
-    S = S[:(n+ctr)]
+    S = S[:(n[0]+ctr+1)]
     return S
-
 #======================================================================================

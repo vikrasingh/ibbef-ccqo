@@ -39,14 +39,6 @@ def main(p,n,k,b0,snr,mu,Sigma,num_instances,num_alg,alg_flag):
         x0,fx0=projgrad.main(p,n,y,X,k)
         print('x0,fx0:',x0,fx0)
 
-        # test sfs
-        xtemp = np.random.normal(size=p).reshape((-1,1))
-        box = np.ones(range(p),dtype=int)
-        x1,fx1=sfs.main(p,n,y,X,k,box,xtemp)
-        print('fx1:',fx1)
-        print('x1:',x1)
-        continue
-
         if alg_flag[0]==1:
             tstart=time.process_time() 
             stop_flag_each_inst[0,j], xibb, rss_each_inst[0,j]=ibb.main(p,n,y,X,A,b,c,k,x0)
