@@ -10,6 +10,8 @@ def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1,max_cputime=600,max_df_iter=500):
     import heapq
     import time
 
+    import getklargest as gkl
+
     epsilon=sys.float_info.epsilon    
     cpustart=time.process_time() # save the starting cpu time
     stopflag = 0   # initialization  
@@ -22,7 +24,7 @@ def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1,max_cputime=600,max_df_iter=500):
     num_iter=0
     num_box=1
     xbest=np.zeros((p,1)) # intialize xbest
-    supp0,xbest[supp0]=getklargest(absxrelax,k)
+    supp0,xbest[supp0]=gkl(absxrelax,k)
     fbest=fx(xbest[supp0],A[np.ix_(supp0,supp0)],b[supp0],c)
     last_fbest_update_iter=num_iter
     #print('xbest,fbest:',xbest,fbest)
@@ -72,7 +74,7 @@ def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1,max_cputime=600,max_df_iter=500):
     xout=xbest
     fout=fbest
 
-    return xout, fout
+    return stopflag, xout, fout
 
 #============================================================================================================================
 def branch(p,n,y,X,A,b,c,k,L,Y,xbest,fbest,xrelax,absxrelax,num_box,box_age_ctr,num_cuts):
@@ -223,29 +225,12 @@ def getfeasiblept(p,n,y,X,A,b,c,k,box,xrelax,absxrelax):
     return xout, fout
 
 #============================================================================================================================
-def getklargest(given_list,select_k):
-        """ Extract a sub array of size kx1 with k largest entries
-    
-        """
-        import numpy as np
-        #print('given_list:',given_list)
-        #print('k:',select_k)
-        if np.shape(given_list)[0]!=1: # if is not a 1D array
-            given_list_1D=given_list.flatten()
-
-        else:
-            given_list_1D=given_list
-        
-        indices_k_largest=np.argpartition(given_list_1D,-select_k)[-select_k:]
-        list_k_largest=given_list[indices_k_largest]
-        return indices_k_largest,list_k_largest
-
-#============================================================================================================================
 def getchildboxes(num_cuts,par_dir,xlb,V):
     """ generate child boxes
     
     """
     import numpy as np
+    import getklargest as gkl
 
     def getallvectices(ii,K,V,num_cuts,ids_array,S):
         """ generate 2^(num_cuts) boxes after cutting along the provided direction
@@ -288,7 +273,7 @@ def getchildboxes(num_cuts,par_dir,xlb,V):
 
 
     S = []  # list of tuples/boxes with length 2^num_cuts 
-    cut_dir_local,_=getklargest(np.abs(xlb[par_dir]),num_cuts) # the indices of the coordinate direction to be cut along
+    cut_dir_local,_=gkl(np.abs(xlb[par_dir]),num_cuts) # the indices of the coordinate direction to be cut along
     cut_dir = par_dir[cut_dir_local]
     #print('cut_dir:',cut_dir)
     #cut_dir=np.array(cut_dir,dtype=int)

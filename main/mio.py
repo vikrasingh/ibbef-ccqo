@@ -1,5 +1,5 @@
 # solving bss using mio
-def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax):
+def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax,max_cputime=600):
     """ Solving BSS using Gurobi
         MATLAB implementation of the bss in R package, following the code from Ryan Tibshirani's github page
        https://github.com/ryantibs/best-subset/blob/master/bestsubset/R/bs.R
@@ -13,7 +13,7 @@ def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax):
     import numpy as np
     import scipy.sparse as sp
 
-    def dense_optimize(rows, cols, c, Q, A, sense, rhs, lb, ub, vtype, solution):
+    def dense_optimize(rows, cols, c, Q, A, sense, rhs, lb, ub, vtype, solution, max_cputime):
         model = gp.Model()
 
         # Set the OutputFlag parameter to 0 to suppress intermediate output
@@ -42,9 +42,11 @@ def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax):
         for j in range(cols):
             if c[j] != 0:
                 obj += c[j] * vars[j]
-        print('obj:',obj)        
+        #print('obj:',obj)        
         model.setObjective(obj)
 
+        model.TimeLimit = max_cputime 
+        
         # Solve
         model.optimize()
         return model, vars
@@ -64,6 +66,7 @@ def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax):
         else:
             return False
         
+    stopflag = 0 # initialization 
     # Put model data into dense matrices
     XX = X.T @ X
     I = np.eye(p)
@@ -83,19 +86,24 @@ def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax):
     num_rows=2*p+1
     num_cols=2*p
     # Optimize
-    optimized_model,vars = dense_optimize(num_rows, num_cols, c, Q, A, sense, rhs, lb, ub, vtype, sol)
+    optimized_model,vars = dense_optimize(num_rows, num_cols, c, Q, A, sense, rhs, lb, ub, vtype, sol, max_cputime)
 
     if optimized_model.status==GRB.OPTIMAL:
         x = optimized_model.getAttr("X",vars)
-        print('xmio:',x[0:p])
+        print("Optimization was successful: Optimal solution found.")
+        
+    elif optimized_model.status == GRB.TIME_LIMIT:
+        stopflag = 6
+        x = optimized_model.getAttr("X",vars)
+        print("Optimization stopped due to time limit.")    
 
-
+    print('xmio:',x[0:p])
     xout = np.reshape(x[0:p],(-1,1))   # make it a col array
-    print('bx:', xout.T @ lin)
-    print('xAx:',xout.T @ Hess @xout )
+    #print('bx:', xout.T @ lin)
+    #print('xAx:',xout.T @ Hess @xout )
     fxout = 0.5 * (xout.T @ Hess @ xout) + xout.T @ lin + const
-    print('fxout:',fxout)
+    #print('fxout:',fxout)
     
-    return xout, fxout
+    return stopflag, xout, fxout
 
 

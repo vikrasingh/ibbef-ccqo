@@ -8,6 +8,7 @@ def main(p,n,k,b0,snr,mu,Sigma,num_instances,num_alg,alg_flag):
     import main.ibbef as ibbef 
     import main.mio as mio 
     import main.projgrad as projgrad
+    import main.sfs as sfs
 
     # initialize the arrays to save the output
     rss_each_inst = np.zeros((num_alg,num_instances))
@@ -37,10 +38,18 @@ def main(p,n,k,b0,snr,mu,Sigma,num_instances,num_alg,alg_flag):
         # find an initial feasible point
         x0,fx0=projgrad.main(p,n,y,X,k)
         print('x0,fx0:',x0,fx0)
-        
+
+        # test sfs
+        xtemp = np.random.normal(size=p).reshape((-1,1))
+        box = np.ones(range(p),dtype=int)
+        x1,fx1=sfs.main(p,n,y,X,k,box,xtemp)
+        print('fx1:',fx1)
+        print('x1:',x1)
+        continue
+
         if alg_flag[0]==1:
             tstart=time.process_time() 
-            xibb, rss_each_inst[0,j]=ibb.main(p,n,y,X,A,b,c,k,x0)
+            stop_flag_each_inst[0,j], xibb, rss_each_inst[0,j]=ibb.main(p,n,y,X,A,b,c,k,x0)
             tend=time.process_time()
             print('start, end:',tstart,tend)
             cpu_time_each_inst[0,j]=tend-tstart
@@ -50,7 +59,7 @@ def main(p,n,k,b0,snr,mu,Sigma,num_instances,num_alg,alg_flag):
 
         if alg_flag[1]==1:  # test ibbef
             tstart=time.process_time()
-            xibbef, rss_each_inst[1,j]=ibbef.main(p,n,y,X,A,b,c,k,x0)
+            stop_flag_each_inst[1,j], xibbef, rss_each_inst[1,j]=ibbef.main(p,n,y,X,A,b,c,k,x0)
             tend=time.process_time()
             print('start, end:',tstart,tend)
             cpu_time_each_inst[1,j]=tend-tstart
@@ -63,7 +72,7 @@ def main(p,n,k,b0,snr,mu,Sigma,num_instances,num_alg,alg_flag):
             low=-M*np.ones((p,1))
             up=M*np.ones((p,1))
             tstart=time.process_time()
-            xmio, rss_each_inst[2,j] = mio.main(p,n,y,X,A,b,c,k,low,up,x0)
+            stop_flag_each_inst[2,j], xmio, rss_each_inst[2,j] = mio.main(p,n,y,X,A,b,c,k,low,up,x0)
             tend=time.process_time()
             cpu_time_each_inst[2,j]=tend-tstart
             print('xmio:',xmio)

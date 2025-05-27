@@ -1,4 +1,4 @@
-def main(p,n,y,X,A,b,c,k,xrelax):
+def main(p,n,y,X,A,b,c,k,xrelax,max_cputime=600):
     """IBB+ with lb using recycled echelon form
 
        xrelax: xRelaxedOpt
@@ -8,7 +8,9 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     from scipy import linalg
     from scipy.optimize import minimize
     import heapq
+    import time
 
+    cpustart=time.process_time() # save the starting cpu time
     epsilon=sys.float_info.epsilon    
     pivtol=max(p,n)*epsilon*np.linalg.norm( A, ord=np.inf)  #  tol to check non-zero pivot for echelon form
     R, ipiv0 = linalg.qr(A, mode='r', pivoting=True)
@@ -87,6 +89,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     #print('CE0:',CE0)
     Ab=np.hstack((A,-b))   # augmented matrix for the first order linear system
     #print('Ab:',Ab)
+    stopflag=0 
     B0=np.ones(p,dtype=int) # initial box of integer ones
     num_iter=0
     num_box=1
@@ -131,9 +134,15 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     while True:
 
         num_iter += 1
+        cpulapsed=time.process_time()-cpustart
         # check for convergence criteria
         if num_box==0:
             print('alg. converged')
+            break
+
+        if cpulapsed>=max_cputime:
+            print('max CPU time reached')
+            stopflag = 6 
             break
         
         # select a new box to process
@@ -151,7 +160,7 @@ def main(p,n,y,X,A,b,c,k,xrelax):
     xout[ipiv1]=xbest[npiv0:p]
     fout=fbest
 
-    return xout, fout
+    return stopflag, xout, fout
                                 
 def branch(p,n,y,X,A,b,c,k,L,Y,E0,CE0,Ab,xbest,fbest,xhat0,fxhat0,xrelax,absxrelax,npiv0,num_box,box_age_ctr):
     """
@@ -532,6 +541,7 @@ def getfeasiblept(p,n,y,X,A,b,c,k,box,xrelax,absxrelax):
     import numpy as np
     from scipy.optimize import minimize
     import main.projgrad as pg
+    import getklargest
 
     def quad_fun(x,A,b,c):
         " x is 1D array"
@@ -606,19 +616,3 @@ def getfeasiblept(p,n,y,X,A,b,c,k,box,xrelax,absxrelax):
     return xout,fout
     """
     
-def getklargest(given_list,select_k):
-        """ Extract a sub array of size kx1 with k largest entries
-    
-        """
-        import numpy as np
-        #print('given_list:',given_list)
-        #print('k:',select_k)
-        if np.shape(given_list)[0]!=1: # if is not a 1D array
-            given_list_1D=given_list.flatten()
-
-        else:
-            given_list_1D=given_list
-        
-        indices_k_largest=np.argpartition(given_list_1D,-select_k)[-select_k:]
-        list_k_largest=given_list[indices_k_largest]
-        return indices_k_largest,list_k_largest
