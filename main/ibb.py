@@ -10,7 +10,7 @@ def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1,max_cputime=600,max_df_iter=500):
     import heapq
     import time
 
-    import getklargest as gkl
+    import utility.getklargest as gkl
 
     epsilon=sys.float_info.epsilon    
     cpustart=time.process_time() # save the starting cpu time
@@ -24,7 +24,7 @@ def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1,max_cputime=600,max_df_iter=500):
     num_iter=0
     num_box=1
     xbest=np.zeros((p,1)) # intialize xbest
-    supp0,xbest[supp0]=gkl(absxrelax,k)
+    supp0,xbest[supp0]=gkl.main(absxrelax,k)
     fbest=fx(xbest[supp0],A[np.ix_(supp0,supp0)],b[supp0],c)
     last_fbest_update_iter=num_iter
     #print('xbest,fbest:',xbest,fbest)
@@ -230,7 +230,7 @@ def getchildboxes(num_cuts,par_dir,xlb,V):
     
     """
     import numpy as np
-    import getklargest as gkl
+    import utility.getklargest as gkl
 
     def getallvectices(ii,K,V,num_cuts,ids_array,S):
         """ generate 2^(num_cuts) boxes after cutting along the provided direction
@@ -273,7 +273,7 @@ def getchildboxes(num_cuts,par_dir,xlb,V):
 
 
     S = []  # list of tuples/boxes with length 2^num_cuts 
-    cut_dir_local,_=gkl(np.abs(xlb[par_dir]),num_cuts) # the indices of the coordinate direction to be cut along
+    cut_dir_local,_=gkl.main(np.abs(xlb[par_dir]),num_cuts) # the indices of the coordinate direction to be cut along
     cut_dir = par_dir[cut_dir_local]
     #print('cut_dir:',cut_dir)
     #cut_dir=np.array(cut_dir,dtype=int)
