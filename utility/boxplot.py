@@ -8,9 +8,12 @@ def main(data, linespecs=None, linewidth=1.6,legendnames=None,
     """
     box_colors=['red','blue','green']
     n=np.shape(data)
-    positions = np.arange(1, n[0] + 1)  # Define positions for the boxes
+    #print(n,data)
+    positions = np.arange(1, n[1] + 1)  # Define positions for the boxes
+    #print(positions)
     plt.figure()
     for i in range(n[1]):
+        print(data[:,i])
         plt.boxplot(data[:,i],positions=[positions[i]],patch_artist=True,
                  boxprops={'facecolor': box_colors[i], 'edgecolor': 'black', 'linewidth': 1.5},
                  whiskerprops={'color': 'black', 'linewidth': 1,'linestyle':'--'},

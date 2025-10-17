@@ -45,7 +45,7 @@ def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax,max_cputime=600):
         #print('obj:',obj)        
         model.setObjective(obj)
 
-        model.TimeLimit = max_cputime 
+        model.Params.TimeLimit = max_cputime 
         
         # Solve
         model.optimize()
