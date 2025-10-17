@@ -1,5 +1,5 @@
 # solving bss using mio
-def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax,max_cputime=600):
+def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax,max_cputime=300):
     """ Solving BSS using Gurobi
         MATLAB implementation of the bss in R package, following the code from Ryan Tibshirani's github page
        https://github.com/ryantibs/best-subset/blob/master/bestsubset/R/bs.R
@@ -18,6 +18,12 @@ def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax,max_cputime=600):
 
         # Set the OutputFlag parameter to 0 to suppress intermediate output
         model.setParam('OutputFlag', 0)
+        
+        # Set the TimeLimit parameter to max_cputime provided
+        model.setParam('TimeLimit', max_cputime)
+        
+        # limit Gurobi to run using only one thread
+        model.setParam('Threads', 1)
 
         # Add variables to model
         vars = []
@@ -44,8 +50,6 @@ def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax,max_cputime=600):
                 obj += c[j] * vars[j]
         #print('obj:',obj)        
         model.setObjective(obj)
-
-        model.Params.TimeLimit = max_cputime 
         
         # Solve
         model.optimize()
@@ -87,14 +91,12 @@ def main(p,n,y,X,Hess,lin,const,k,low,up,xrelax,max_cputime=600):
     num_cols=2*p
     # Optimize
     optimized_model,vars = dense_optimize(num_rows, num_cols, c, Q, A, sense, rhs, lb, ub, vtype, sol, max_cputime)
-
-    if optimized_model.status==GRB.OPTIMAL:
-        x = optimized_model.getAttr("X",vars)
+    x = optimized_model.getAttr("X",vars)
+    if optimized_model.Status==GRB.OPTIMAL:
         print("Optimization was successful: Optimal solution found.")
         
-    elif optimized_model.status == GRB.TIME_LIMIT:
+    elif optimized_model.Status == GRB.TIME_LIMIT:
         stopflag = 6
-        x = optimized_model.getAttr("X",vars)
         print("Optimization stopped due to time limit.")    
 
     print('xmio:',x[0:p])

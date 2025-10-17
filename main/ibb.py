@@ -1,4 +1,4 @@
-def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1,max_cputime=600,max_df_iter=500):
+def main(p,n,y,X,A,b,c,k,xrelax,num_cuts=1,max_cputime=5,max_df_iter=300):
     """IBB+ with lb using recycled echelon form
 
        xrelax: xRelaxedOpt
